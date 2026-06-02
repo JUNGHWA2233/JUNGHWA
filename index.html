@@ -163,30 +163,8 @@ body.readonly .readonly-banner{display:block;}
       <button class="btn-dark no-readonly" onclick="openShModal()">+ 건 추가</button>
     </div>
   </div>
-  <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-    <table style="width:100%;border-collapse:collapse;min-width:1100px;background:var(--surface);border-radius:10px;overflow:hidden;border:1px solid var(--border);">
-      <thead>
-        <tr style="background:#e8e6e0;">
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:36px;">순번</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:86px;">출고일</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:95px;">바이어</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:105px;">P.O#</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:65px;">사이즈</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">P/I</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">선적서류</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:54px;">스케줄</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:54px;">라벨지</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">면장</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">배차</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">출고</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:65px;">선적/매출</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">B/L발송</th>
-          <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);">비고</th>
-          <th style="border:1px solid var(--border);width:52px;"></th>
-        </tr>
-      </thead>
-      <tbody id="sh-tbody"><tr><td colspan="16" style="text-align:center;padding:2rem;color:var(--text3);">로딩 중...</td></tr></tbody>
-    </table>
+  <div id="sh-container">
+    <div style="text-align:center;padding:2rem;color:var(--text3);">로딩 중...</div>
   </div>
 </div>
 
@@ -741,7 +719,7 @@ window.saveEditTask=async function(){
 // ── 출고일정 (REST API) ──
 let allSh=[];
 window.loadShipments=async function(){
-  document.getElementById('sh-tbody').innerHTML='<tr><td colspan="16" style="text-align:center;padding:2rem;color:var(--text3);">로딩 중...</td></tr>';
+  document.getElementById('sh-container').innerHTML='<div style="text-align:center;padding:2rem;color:var(--text3);">로딩 중...</div>';
   const data=await fbGet('shipments');
   allSh=[];
   if(data) Object.entries(data).forEach(([key,val])=>allSh.push({key,...val}));
@@ -758,13 +736,34 @@ window.applyShFilter=function(){
   const fm=document.getElementById('sh-month-filter').value;
   const filtered=fm?allSh.filter(s=>s.month===fm):[...allSh];
   document.getElementById('sh-label').textContent=`전체 출고 건 (${filtered.length}건)`;
-  const tbody=document.getElementById('sh-tbody');
-  if(!filtered.length){ tbody.innerHTML='<tr><td colspan="16" style="text-align:center;padding:2rem;color:var(--text3);">등록된 출고 건이 없습니다</td></tr>'; return; }
+  const container=document.getElementById('sh-container');
+  if(!filtered.length){ container.innerHTML='<div style="text-align:center;padding:2rem;color:var(--text3);">등록된 출고 건이 없습니다</div>'; return; }
+
   const groups={};
   filtered.forEach(s=>{ const m=s.month||s.shipDate?.slice(0,7)||'기타'; if(!groups[m]) groups[m]=[]; groups[m].push(s); });
+
+  const thead=`<thead><tr style="background:#e8e6e0;">
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:36px;">순번</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:86px;">출고일</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:95px;">바이어</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:105px;">P.O#</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:65px;">사이즈</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">P/I</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">선적서류</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:54px;">스케줄</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:54px;">라벨지</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">면장</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">배차</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">출고</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:65px;">선적/매출</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">B/L발송</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);">비고</th>
+    <th style="border:1px solid var(--border);width:52px;"></th>
+  </tr></thead>`;
+
   let html=''; let idx=1;
   Object.keys(groups).sort().forEach(month=>{
-    html+=`<tr><td colspan="16" style="background:#e8e6e0;padding:6px 10px;font-size:12px;font-weight:700;color:var(--text2);font-family:var(--mono);border:1px solid var(--border);">📅 ${month}</td></tr>`;
+    let rows='';
     groups[month].forEach(s=>{
       const isDone=s.shipout==='o';
       const dc=isDone?'color:#1a1916;font-weight:600;':'color:#c0392b;font-weight:700;';
@@ -773,7 +772,7 @@ window.applyShFilter=function(){
         const icon=v==='o'?'<span style="color:#165c2a;font-size:16px;font-weight:700;">○</span>':v==='d'?'<span style="color:#7a4a08;font-size:16px;">△</span>':'';
         return `<td style="text-align:center;padding:5px 3px;border:1px solid var(--border);cursor:pointer;" onclick="cycleCell('${s.key}','${col}')">${icon}</td>`;
       }).join('');
-      html+=`<tr style="background:${isDone?'#f8f8f6':idx%2===0?'#fff':'#fafaf8'};">
+      rows+=`<tr style="background:${isDone?'#f8f8f6':idx%2===0?'#fff':'#fafaf8'};">
         <td style="text-align:center;padding:5px 6px;border:1px solid var(--border);font-size:12px;color:var(--text3);font-family:var(--mono);">${idx}</td>
         <td style="text-align:center;padding:5px 6px;border:1px solid var(--border);font-size:11px;font-family:var(--mono);${dc}">${s.shipDate||'-'}</td>
         <td style="padding:5px 6px;border:1px solid var(--border);font-size:12px;font-weight:600;">${esc(s.buyer||'')}</td>
@@ -785,10 +784,21 @@ window.applyShFilter=function(){
           <button onclick="openShModal('${s.key}')" style="font-size:11px;padding:2px 5px;background:none;border:1px solid var(--border);border-radius:3px;cursor:pointer;display:block;width:100%;margin-bottom:2px;font-family:var(--sans);">수정</button>
           <button onclick="deleteSh('${s.key}')" style="font-size:11px;padding:2px 5px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--sans);">삭제</button>
         </td>
-      </tr>`; idx++;
+      </tr>`;
+      idx++;
     });
+    html+=`<div style="margin-bottom:24px;">
+      <div style="font-size:14px;font-weight:700;color:var(--text);font-family:var(--mono);padding:6px 2px 8px;border-bottom:2px solid var(--border2);margin-bottom:8px;">
+        📅 ${month} <span style="font-size:12px;font-weight:400;color:var(--text3);">${groups[month].length}건</span>
+      </div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <table style="width:100%;border-collapse:collapse;min-width:1100px;background:var(--surface);border-radius:8px;overflow:hidden;border:1px solid var(--border);">
+          ${thead}<tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
   });
-  tbody.innerHTML=html;
+  container.innerHTML=html;
 };
 
 window.cycleCell=async function(key,col){
