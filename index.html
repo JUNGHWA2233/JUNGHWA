@@ -197,15 +197,9 @@ body.readonly .readonly-banner{display:block;}
     <button class="btn-dark no-readonly" onclick="openIssueModal()">+ 이슈 등록</button>
   </div>
   <!-- 이슈 통계 -->
+  <!-- 이슈 통계 카드 -->
   <div id="issue-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;"></div>
-  <div style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;">
-    <button class="btn-dark btn-light" style="font-size:12px;padding:5px 10px;" onclick="setIssueFilter('')">전체</button>
-    <button style="font-size:12px;padding:5px 10px;background:#fff0ee;border:1px solid #f5b8b0;color:#c0392b;border-radius:6px;cursor:pointer;" onclick="setIssueFilter('진행중')">진행중</button>
-    <button style="font-size:12px;padding:5px 10px;background:#e4f2e8;border:1px solid #a8d9b5;color:#165c2a;border-radius:6px;cursor:pointer;" onclick="setIssueFilter('완료')">완료</button>
-    <button style="font-size:12px;padding:5px 10px;background:#eef4ff;border:1px solid #b8cef5;color:#1a3a7a;border-radius:6px;cursor:pointer;" onclick="setIssueFilter('전자도어락')">전자도어락</button>
-    <button style="font-size:12px;padding:5px 10px;background:#f5f0e8;border:1px solid #e0c898;color:#5a3a08;border-radius:6px;cursor:pointer;" onclick="setIssueFilter('기계식도어락')">기계식도어락</button>
-  </div>
-  <div id="issue-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+  <div id="issue-list" style="display:flex;flex-direction:column;gap:16px;"></div>
 </div>
 
 <!-- 수입 건 -->
@@ -777,9 +771,7 @@ window.applyShFilter=function(){
     html+=`<tr><td colspan="16" style="background:#e8e6e0;padding:6px 10px;font-size:12px;font-weight:700;color:var(--text2);font-family:var(--mono);border:1px solid var(--border);">📅 ${month}</td></tr>`;
     groups[month].forEach(s=>{
       const isDone=s.shipout==='o';
-      const isToday=s.shipDate===todayStr;
-      const isSoon=s.shipDate&&s.shipDate>todayStr&&Math.floor((new Date(s.shipDate)-new Date(todayStr))/864e5)<=3;
-      const dc=isDone?'color:#1a1916;font-weight:600;':(isToday||isSoon)?'color:#c0392b;font-weight:700;':'';
+      const dc=isDone?'color:#1a1916;font-weight:600;':'color:#c0392b;font-weight:700;';
       const cells=SH_COLS.map(col=>{
         const v=s[col]||'';
         const icon=v==='o'?'<span style="color:#165c2a;font-size:16px;font-weight:700;">○</span>':v==='d'?'<span style="color:#7a4a08;font-size:16px;">△</span>':'';
@@ -892,7 +884,6 @@ window.deleteIssue=async function(key){
 window.renderIssues=function(){
   const STATUS_STYLE={'진행중':'background:#fff0ee;color:#c0392b;border:1px solid #f5b8b0;','완료':'background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;'};
   const CAT_STYLE={'전자도어락':'background:#eef4ff;color:#1a3a7a;border:1px solid #b8cef5;','기계식도어락':'background:#f5f0e8;color:#5a3a08;border:1px solid #e0c898;'};
-  // 통계
   const total=issues.length;
   const elec=issues.filter(i=>i.category==='전자도어락').length;
   const mech=issues.filter(i=>i.category==='기계식도어락').length;
@@ -902,19 +893,17 @@ window.renderIssues=function(){
     <div style="background:#fff0ee;border:1px solid #f5b8b0;border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:20px;font-weight:700;font-family:var(--mono);color:#c0392b;">${inprog}</div><div style="font-size:11px;color:#c0392b;">진행중</div></div>
     <div style="background:#eef4ff;border:1px solid #b8cef5;border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:20px;font-weight:700;font-family:var(--mono);color:#1a3a7a;">${elec}</div><div style="font-size:11px;color:#1a3a7a;">전자도어락</div></div>
     <div style="background:#f5f0e8;border:1px solid #e0c898;border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:20px;font-weight:700;font-family:var(--mono);color:#5a3a08;">${mech}</div><div style="font-size:11px;color:#5a3a08;">기계식도어락</div></div>`;
-  let filtered=issues;
-  if(issueFilter==='진행중'||issueFilter==='완료') filtered=filtered.filter(i=>i.status===issueFilter);
-  else if(issueFilter==='전자도어락'||issueFilter==='기계식도어락') filtered=filtered.filter(i=>i.category===issueFilter);
+
   const container=document.getElementById('issue-list');
-  if(!filtered.length){ container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">등록된 이슈가 없습니다</div>'; return; }
-  container.innerHTML=filtered.map(iss=>`
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;">
+  if(!issues.length){ container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">등록된 이슈가 없습니다</div>'; return; }
+
+  function makeIssueCard(iss){
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:8px;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.75rem;gap:8px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
           <span style="font-size:14px;font-weight:700;">${esc(iss.buyer||'')}</span>
           ${iss.po?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3);">${esc(iss.po)}</span>`:''}
           <span style="font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;${STATUS_STYLE[iss.status]||''}">${esc(iss.status)}</span>
-          ${iss.category?`<span style="font-size:11px;padding:2px 7px;border-radius:99px;font-weight:600;${CAT_STYLE[iss.category]||''}">${esc(iss.category)}</span>`:''}
           ${iss.author?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);">작성: ${esc(iss.author)}${iss.updatedBy?' / 수정: '+esc(iss.updatedBy):''}</span>`:''}
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;">
@@ -936,7 +925,47 @@ window.renderIssues=function(){
         </div>
       </div>
       <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:.75rem;">발생일: ${iss.date||'-'}</div>
-    </div>`).join('');
+    </div>`;
+  }
+
+  function makeCategorySection(cat, catLabel, catColor, catBg, catBorder){
+    const catIssues = issues.filter(i=>i.category===cat);
+    if(!catIssues.length) return '';
+    const inprogItems = catIssues.filter(i=>i.status==='진행중');
+    const doneItems   = catIssues.filter(i=>i.status==='완료');
+    return `<div style="background:var(--surface);border:2px solid ${catBorder};border-radius:12px;overflow:hidden;">
+      <div style="background:${catBg};padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:14px;font-weight:700;color:${catColor};">${catLabel}</span>
+        <span style="font-size:12px;color:${catColor};font-family:var(--mono);">총 ${catIssues.length}건 · 진행중 ${inprogItems.length}건</span>
+      </div>
+      ${inprogItems.length?`
+      <div style="padding:12px 14px 0;">
+        <div style="font-size:12px;font-weight:600;color:#c0392b;padding:4px 8px;background:#fff0ee;border-radius:5px;margin-bottom:8px;display:inline-block;">⚠️ 진행중 ${inprogItems.length}건</div>
+        ${inprogItems.map(iss=>makeIssueCard(iss)).join('')}
+      </div>`:''}
+      ${doneItems.length?`
+      <div style="padding:12px 14px 0;">
+        <div style="font-size:12px;font-weight:600;color:#165c2a;padding:4px 8px;background:#e4f2e8;border-radius:5px;margin-bottom:8px;display:inline-block;">✅ 완료 ${doneItems.length}건</div>
+        ${doneItems.map(iss=>makeIssueCard(iss)).join('')}
+      </div>`:''}
+      <div style="height:4px;"></div>
+    </div>`;
+  }
+
+  // 카테고리 미설정 항목
+  const etcIssues = issues.filter(i=>!i.category||i.category==='기타');
+
+  container.innerHTML=
+    makeCategorySection('전자도어락','전자도어락','#1a3a7a','#eef4ff','#b8cef5') +
+    makeCategorySection('기계식도어락','기계식도어락','#5a3a08','#f5f0e8','#e0c898') +
+    (etcIssues.length?`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <div style="background:var(--surface2);padding:10px 14px;">
+        <span style="font-size:14px;font-weight:700;color:var(--text2);">기타 / 미분류</span>
+      </div>
+      <div style="padding:12px 14px;">
+        ${etcIssues.map(iss=>makeIssueCard(iss)).join('')}
+      </div>
+    </div>`:'');
 };
 
 // ── 수입 건 (REST API) ──
