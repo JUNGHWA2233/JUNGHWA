@@ -855,6 +855,15 @@ window.loadIssues=async function(){
   issues.sort((a,b)=>(b.ts||0)-(a.ts||0));
   renderIssues();
 };
+window.scrollToIssue=function(cat, status){
+  // 해당 카테고리 섹션으로 스크롤
+  const sections=document.querySelectorAll('[data-cat]');
+  sections.forEach(el=>{
+    if(el.dataset.cat===cat){
+      el.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  });
+};
 window.setIssueFilter=function(f){ issueFilter=f; renderIssues(); };
 window.openIssueModal=function(key){
   document.getElementById('issue-edit-key').value=key||'';
@@ -898,20 +907,30 @@ window.renderIssues=function(){
   const mechInprog=issues.filter(i=>i.category==='기계식도어락'&&i.status==='진행중').length;
   const mechDone=issues.filter(i=>i.category==='기계식도어락'&&i.status==='완료').length;
   document.getElementById('issue-stats').innerHTML=`
-    <div style="background:#eef4ff;border:1px solid #b8cef5;border-radius:8px;padding:12px 14px;">
-      <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#1a3a7a;text-align:center;">${elec}</div>
-      <div style="font-size:12px;font-weight:600;color:#1a3a7a;text-align:center;margin-bottom:6px;">전자도어락</div>
-      <div style="display:flex;justify-content:center;gap:8px;">
-        <span style="font-size:11px;padding:2px 8px;border-radius:99px;background:#fff0ee;color:#c0392b;border:1px solid #f5b8b0;font-weight:600;">진행중 ${elecInprog}</span>
-        <span style="font-size:11px;padding:2px 8px;border-radius:99px;background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;font-weight:600;">완료 ${elecDone}</span>
+    <div style="background:#eef4ff;border:1px solid #b8cef5;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:13px;font-weight:700;color:#1a3a7a;margin-bottom:10px;">전자도어락 <span style="font-family:var(--mono);">${elec}건</span></div>
+      <div style="display:flex;gap:10px;">
+        <div onclick="scrollToIssue('전자도어락','진행중')" style="flex:1;cursor:pointer;background:#fff0ee;border:1px solid #f5b8b0;border-radius:8px;padding:8px 10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#c0392b;">${elecInprog}</div>
+          <div style="font-size:11px;color:#c0392b;font-weight:600;">진행중</div>
+        </div>
+        <div onclick="scrollToIssue('전자도어락','완료')" style="flex:1;cursor:pointer;background:#e4f2e8;border:1px solid #a8d9b5;border-radius:8px;padding:8px 10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#165c2a;">${elecDone}</div>
+          <div style="font-size:11px;color:#165c2a;font-weight:600;">완료</div>
+        </div>
       </div>
     </div>
-    <div style="background:#f5f0e8;border:1px solid #e0c898;border-radius:8px;padding:12px 14px;">
-      <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#5a3a08;text-align:center;">${mech}</div>
-      <div style="font-size:12px;font-weight:600;color:#5a3a08;text-align:center;margin-bottom:6px;">기계식도어락</div>
-      <div style="display:flex;justify-content:center;gap:8px;">
-        <span style="font-size:11px;padding:2px 8px;border-radius:99px;background:#fff0ee;color:#c0392b;border:1px solid #f5b8b0;font-weight:600;">진행중 ${mechInprog}</span>
-        <span style="font-size:11px;padding:2px 8px;border-radius:99px;background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;font-weight:600;">완료 ${mechDone}</span>
+    <div style="background:#f5f0e8;border:1px solid #e0c898;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:13px;font-weight:700;color:#5a3a08;margin-bottom:10px;">기계식도어락 <span style="font-family:var(--mono);">${mech}건</span></div>
+      <div style="display:flex;gap:10px;">
+        <div onclick="scrollToIssue('기계식도어락','진행중')" style="flex:1;cursor:pointer;background:#fff0ee;border:1px solid #f5b8b0;border-radius:8px;padding:8px 10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#c0392b;">${mechInprog}</div>
+          <div style="font-size:11px;color:#c0392b;font-weight:600;">진행중</div>
+        </div>
+        <div onclick="scrollToIssue('기계식도어락','완료')" style="flex:1;cursor:pointer;background:#e4f2e8;border:1px solid #a8d9b5;border-radius:8px;padding:8px 10px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#165c2a;">${mechDone}</div>
+          <div style="font-size:11px;color:#165c2a;font-weight:600;">완료</div>
+        </div>
       </div>
     </div>`;
 
@@ -962,7 +981,7 @@ window.renderIssues=function(){
     if(!catIssues.length) return '';
     const inprogItems = catIssues.filter(i=>i.status==='진행중');
     const doneItems   = catIssues.filter(i=>i.status==='완료');
-    return `<div style="background:var(--surface);border:2px solid ${catBorder};border-radius:12px;overflow:hidden;">
+    return `<div data-cat="${cat}" style="background:var(--surface);border:2px solid ${catBorder};border-radius:12px;overflow:hidden;">
       <div style="background:${catBg};padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
         <span style="font-size:14px;font-weight:700;color:${catColor};">${catLabel}</span>
         <span style="font-size:12px;color:${catColor};font-family:var(--mono);">총 ${catIssues.length}건 · 진행중 ${inprogItems.length}건</span>
