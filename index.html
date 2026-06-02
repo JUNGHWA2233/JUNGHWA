@@ -429,7 +429,9 @@ function startApp(){
   document.getElementById('today-date').textContent=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   // 오늘 메모 로드
   const savedMemo = localStorage.getItem('today-memo-'+todayStr)||'';
-  document.getElementById('today-memo').value=savedMemo;
+  const memoEl = document.getElementById('today-memo');
+  memoEl.value=savedMemo;
+  setTimeout(()=>{ memoEl.style.height='auto'; memoEl.style.height=memoEl.scrollHeight+'px'; }, 50);
 
   onValue(buyersRef,snap=>{ buyers=snap.val()||{}; renderAll(); });
   onValue(query(logsRef,orderByChild('ts')),snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.reverse(); if(curPage==='history') renderHistory(); });
