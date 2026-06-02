@@ -962,15 +962,15 @@ window.renderIssues=function(){
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
         <div>
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">이슈 내용</div>
-          <div style="font-size:13px;line-height:1.6;font-weight:500;color:var(--text);">${esc(iss.desc||'')}</div>
+          <div style="font-size:13px;line-height:1.6;font-weight:500;color:var(--text);white-space:pre-wrap;">${esc(iss.desc||'')}</div>
         </div>
         <div>
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">원인 파악</div>
-          <div style="font-size:13px;line-height:1.6;">${esc(iss.cause||'')||'<span style="color:var(--text3);font-style:italic;">미입력</span>'}</div>
+          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(iss.cause||'')||'<span style="color:var(--text3);font-style:italic;">미입력</span>'}</div>
         </div>
         <div>
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">조치 내용</div>
-          <div style="font-size:13px;line-height:1.6;">${esc(iss.action||'')||'<span style="color:var(--text3);font-style:italic;">미입력</span>'}</div>
+          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(iss.action||'')||'<span style="color:var(--text3);font-style:italic;">미입력</span>'}</div>
         </div>
       </div>
     </div>`;
