@@ -455,11 +455,7 @@ function startApp(){
 
   onValue(buyersRef,snap=>{ buyers=snap.val()||{}; renderAll(); });
   onValue(query(logsRef,orderByChild('ts')),snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.reverse(); if(curPage==='history') renderHistory(); });
-  onValue(issuesRef,snap=>{
-    issues=[];
-    if(snap.exists()){ snap.forEach(c=>issues.push({key:c.key,...c.val()})); issues.sort((a,b)=>(b.ts||0)-(a.ts||0)); }
-    if(curPage==='issues') renderIssues();
-  });
+  // issues는 REST API로 처리
   switchPage('today');
 }
 
@@ -477,7 +473,7 @@ window.switchPage=function(p){
   if(p==='shipments') loadShipments();
   if(p==='imports') loadImports();
   if(p==='history') renderHistory();
-  if(p==='issues') renderIssues();
+  if(p==='issues') loadIssues();
   if(p==='buyers') renderBuyers();
 };
 
@@ -852,6 +848,13 @@ window.deleteSh=async function(key){
 };
 
 // ── 이슈 ──
+window.loadIssues=async function(){
+  const data=await fbGet('issues');
+  issues=[];
+  if(data) Object.entries(data).forEach(([key,val])=>issues.push({key,...val}));
+  issues.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  renderIssues();
+};
 window.setIssueFilter=function(f){ issueFilter=f; renderIssues(); };
 window.openIssueModal=function(key){
   document.getElementById('issue-edit-key').value=key||'';
@@ -875,11 +878,13 @@ window.saveIssue=async function(){
   if(key){ data.updatedBy=currentUser?.name||''; await set(ref(db,'issues/'+key),data); }
   else await set(push(issuesRef),data);
   closeModal('issue-modal'); showToast('저장됐습니다');
+  await loadIssues();
 };
 window.deleteIssue=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   if(!confirm('삭제할까요?')) return;
   await remove(ref(db,'issues/'+key));
+  await loadIssues();
 };
 window.renderIssues=function(){
   const STATUS_STYLE={'진행중':'background:#fff0ee;color:#c0392b;border:1px solid #f5b8b0;','완료':'background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;'};
@@ -899,10 +904,10 @@ window.renderIssues=function(){
 
   function makeIssueCard(iss){
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:8px;">
+      <!-- 상단: 바이어 + 상태 + 수정/삭제 -->
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.75rem;gap:8px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-          <span style="font-size:14px;font-weight:700;">${esc(iss.buyer||'')}</span>
-          ${iss.po?`<span style="font-size:11px;font-family:var(--mono);color:var(--text3);">${esc(iss.po)}</span>`:''}
+          <span style="font-size:15px;font-weight:700;">${esc(iss.buyer||'')}</span>
           <span style="font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;${STATUS_STYLE[iss.status]||''}">${esc(iss.status)}</span>
           ${iss.author?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);">작성: ${esc(iss.author)}${iss.updatedBy?' / 수정: '+esc(iss.updatedBy):''}</span>`:''}
         </div>
@@ -911,20 +916,28 @@ window.renderIssues=function(){
           <button onclick="deleteIssue('${iss.key}')" style="font-size:12px;padding:3px 8px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--sans);">삭제</button>
         </div>
       </div>
+      <!-- 핵심 정보 바 -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;background:var(--surface2);border-radius:7px;padding:8px 12px;margin-bottom:.75rem;">
+        ${iss.po?`<div style="display:flex;flex-direction:column;gap:1px;"><div style="font-size:10px;font-weight:600;color:var(--text3);font-family:var(--mono);">P.O#</div><div style="font-size:13px;font-weight:700;color:var(--text);font-family:var(--mono);">${esc(iss.po)}</div></div>`:''}
+        ${iss.item?`<div style="display:flex;flex-direction:column;gap:1px;"><div style="font-size:10px;font-weight:600;color:var(--text3);font-family:var(--mono);">품목</div><div style="font-size:13px;font-weight:600;color:var(--text);">${esc(iss.item)}</div></div>`:''}
+        ${iss.date?`<div style="display:flex;flex-direction:column;gap:1px;"><div style="font-size:10px;font-weight:600;color:var(--text3);font-family:var(--mono);">발생일</div><div style="font-size:13px;font-weight:600;color:var(--text);font-family:var(--mono);">${esc(iss.date)}</div></div>`:''}
+        ${iss.qty?`<div style="display:flex;flex-direction:column;gap:1px;"><div style="font-size:10px;font-weight:600;color:var(--text3);font-family:var(--mono);">수량</div><div style="font-size:13px;font-weight:600;color:var(--text);">${esc(iss.qty)}</div></div>`:''}
+      </div>
+      <!-- 이슈내용 + 원인 + 조치 -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-        <div><div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">이슈 내용</div>
-          <div style="font-size:13px;line-height:1.6;">${esc(iss.desc||'')}</div>
-          ${iss.item?`<div style="font-size:11px;color:var(--text3);margin-top:3px;">품목: ${esc(iss.item)}</div>`:''}
-          ${iss.qty?`<div style="font-size:11px;color:var(--text3);">수량: ${esc(iss.qty)}</div>`:''}
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">이슈 내용</div>
+          <div style="font-size:13px;line-height:1.6;font-weight:500;color:var(--text);">${esc(iss.desc||'')}</div>
         </div>
-        <div><div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">원인 파악</div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">원인 파악</div>
           <div style="font-size:13px;line-height:1.6;">${esc(iss.cause||'')||'<span style="color:var(--text3);font-style:italic;">미입력</span>'}</div>
         </div>
-        <div><div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">조치 내용</div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">조치 내용</div>
           <div style="font-size:13px;line-height:1.6;">${esc(iss.action||'')||'<span style="color:var(--text3);font-style:italic;">미입력</span>'}</div>
         </div>
       </div>
-      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:.75rem;">발생일: ${iss.date||'-'}</div>
     </div>`;
   }
 
