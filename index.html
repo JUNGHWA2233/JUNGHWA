@@ -504,7 +504,7 @@ async function renderTodayAlerts(){
   }catch(e){}
   if(!alerts.length){ area.innerHTML=''; return; }
   area.innerHTML=`<div style="background:#fdf0dc;border:2px solid #f5cc80;border-radius:10px;padding:12px 14px;margin-bottom:1rem;">
-    <div style="font-size:13px;font-weight:700;color:#7a4a08;margin-bottom:6px;">🔔 오늘 처리 항목 ${alerts.length}건</div>
+    <div style="font-size:13px;font-weight:700;color:#7a4a08;margin-bottom:6px;">🔔 오늘 수출/수입 건 ${alerts.length}건</div>
     ${alerts.map(a=>`<div style="font-size:13px;color:#5a3a08;padding:3px 0;border-bottom:1px solid #f5e0a0;">${a}</div>`).join('')}
   </div>`;
 }
