@@ -521,7 +521,7 @@ body.readonly .readonly-banner{display:block;}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, remove, push, query, orderByChild } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, get, onValue, remove, push, query, orderByChild } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const firebaseConfig = {
@@ -1142,7 +1142,11 @@ window.saveShipment=async function(){
   if(key) await set(ref(db,'shipments/'+key),data);
   else await set(push(shipmentsRef),data);
   closeModal('modal-shipment');
-  setTimeout(()=>renderShipments(), 500);
+  // 저장 후 직접 데이터 다시 읽어서 렌더
+  const snap = await get(shipmentsRef);
+  shipments = [];
+  if(snap.exists()) snap.forEach(c=>shipments.push({key:c.key,...c.val()}));
+  renderShipments();
   showToast('저장됐습니다');
 };
 
@@ -1292,7 +1296,11 @@ window.saveImport=async function(){
   if(key) await set(ref(db,'imports/'+key),data);
   else await set(push(importsRef),data);
   closeModal('modal-import');
-  setTimeout(()=>renderImports(), 500);
+  const snapI = await get(importsRef);
+  imports = [];
+  if(snapI.exists()) snapI.forEach(c=>imports.push({key:c.key,...c.val()}));
+  imports.reverse();
+  renderImports();
   showToast('저장됐습니다');
 };
 
