@@ -639,6 +639,10 @@ window.switchPage=function(p){
   document.getElementById('page-issues').style.display   =p==='issues'   ?'block':'none';
   document.getElementById('page-imports').style.display  =p==='imports'  ?'block':'none';
   document.getElementById('page-history').style.display  =p==='history'  ?'block':'none';
+  if(p==='shipments') renderShipments();
+  if(p==='imports') renderImports();
+  if(p==='issues') renderIssues();
+  if(p==='history') renderHistory();
 };
 
 function renderAll(){ renderToday(); renderBuyers(); }
