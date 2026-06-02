@@ -650,8 +650,21 @@ window.switchPage=function(p){
   document.getElementById('page-issues').style.display   =p==='issues'   ?'block':'none';
   document.getElementById('page-imports').style.display  =p==='imports'  ?'block':'none';
   document.getElementById('page-history').style.display  =p==='history'  ?'block':'none';
-  if(p==='shipments') renderShipments();
-  if(p==='imports') renderImports();
+  if(p==='shipments'){
+    get(shipmentsRef).then(snap=>{
+      shipments=[];
+      if(snap.exists()) snap.forEach(c=>shipments.push({key:c.key,...c.val()}));
+      renderShipments();
+    });
+  }
+  if(p==='imports'){
+    get(importsRef).then(snap=>{
+      imports=[];
+      if(snap.exists()) snap.forEach(c=>imports.push({key:c.key,...c.val()}));
+      imports.reverse();
+      renderImports();
+    });
+  }
   if(p==='issues') renderIssues();
   if(p==='history') renderHistory();
 };
@@ -1013,7 +1026,13 @@ function getStatusCell(val){
   return '';
 }
 
-window.renderShipments=function(){
+window.renderShipments=async function(){
+  // 항상 최신 데이터 직접 읽기
+  try{
+    const snap=await get(shipmentsRef);
+    shipments=[];
+    if(snap.exists()) snap.forEach(c=>shipments.push({key:c.key,...c.val()}));
+  }catch(e){console.error(e);}
   // 월 필터 옵션
   const months=[...new Set(shipments.map(s=>s.month||'').filter(Boolean))].sort().reverse();
   const selEl=document.getElementById('shipment-month-filter');
@@ -1321,7 +1340,13 @@ window.deleteImport=async function(key){
   await remove(ref(db,'imports/'+key));
 };
 
-window.renderImports=function(){
+window.renderImports=async function(){
+  try{
+    const snap=await get(importsRef);
+    imports=[];
+    if(snap.exists()) snap.forEach(c=>imports.push({key:c.key,...c.val()}));
+    imports.reverse();
+  }catch(e){console.error(e);}
   const STATUS_STYLE={
     '발주':'background:#eef4ff;color:#1a3a7a;border:1px solid #b8cef5;',
     '선적':'background:#fff3e0;color:#e65100;border:1px solid #ffcc80;',
