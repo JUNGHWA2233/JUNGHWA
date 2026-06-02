@@ -621,8 +621,19 @@ function startApp(){
     if(snap.exists()){ snap.forEach(c=>{ issues.push({key:c.key,...c.val()}); }); issues.sort((a,b)=>(b.ts||0)-(a.ts||0)); }
     if(document.getElementById('issue-list')) renderIssues();
   });
-  onValue(importsRef, snap=>{ imports=[]; if(snap.exists()) snap.forEach(c=>imports.push({key:c.key,...c.val()})); imports.reverse(); renderImports(); renderTodayAlerts(); });
-  onValue(shipmentsRef, snap=>{ shipments=[]; if(snap.exists()) snap.forEach(c=>shipments.push({key:c.key,...c.val()})); renderShipments(); renderTodayAlerts(); });
+  onValue(importsRef, snap=>{
+    imports=[];
+    if(snap.exists()) snap.forEach(c=>imports.push({key:c.key,...c.val()}));
+    imports.reverse();
+    if(curPage==='imports') renderImports();
+    renderTodayAlerts();
+  });
+  onValue(shipmentsRef, snap=>{
+    shipments=[];
+    if(snap.exists()) snap.forEach(c=>shipments.push({key:c.key,...c.val()}));
+    if(curPage==='shipments') renderShipments();
+    renderTodayAlerts();
+  });
 
   switchPage('today');
 }
