@@ -1033,15 +1033,15 @@ window.renderShipments=async function(){
     shipments=[];
     if(snap.exists()) snap.forEach(c=>shipments.push({key:c.key,...c.val()}));
   }catch(e){console.error(e);}
-  // 월 필터 옵션
-  const months=[...new Set(shipments.map(s=>s.month||'').filter(Boolean))].sort().reverse();
   const selEl=document.getElementById('shipment-month-filter');
+  const months2=[...new Set(shipments.map(s=>s.month||'').filter(Boolean))].sort().reverse();
   const prevMonth=selEl.value;
-  selEl.innerHTML='<option value="">전체</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
-  if(prevMonth) selEl.value=prevMonth;
+  selEl.innerHTML='<option value="">전체</option>'+months2.map(m=>`<option value="${m}">${m}</option>`).join('');
+  if(prevMonth && months2.includes(prevMonth)) selEl.value=prevMonth;
+  else selEl.value='';
 
   const filterMonth=selEl.value;
-  let filtered=shipments;
+  let filtered=[...shipments];
   if(filterMonth) filtered=filtered.filter(s=>s.month===filterMonth);
 
   // 출고일 기준 오름차순 정렬 (빠른 날이 맨 위)
