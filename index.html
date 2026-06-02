@@ -198,7 +198,7 @@ body.readonly .readonly-banner{display:block;}
   </div>
   <!-- 이슈 통계 -->
   <!-- 이슈 통계 카드 -->
-  <div id="issue-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;"></div>
+  <div id="issue-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;"></div>
   <div id="issue-list" style="display:flex;flex-direction:column;gap:16px;"></div>
 </div>
 
@@ -893,11 +893,27 @@ window.renderIssues=function(){
   const elec=issues.filter(i=>i.category==='전자도어락').length;
   const mech=issues.filter(i=>i.category==='기계식도어락').length;
   const inprog=issues.filter(i=>i.status==='진행중').length;
+  const elecInprog=issues.filter(i=>i.category==='전자도어락'&&i.status==='진행중').length;
+  const elecDone=issues.filter(i=>i.category==='전자도어락'&&i.status==='완료').length;
+  const mechInprog=issues.filter(i=>i.category==='기계식도어락'&&i.status==='진행중').length;
+  const mechDone=issues.filter(i=>i.category==='기계식도어락'&&i.status==='완료').length;
   document.getElementById('issue-stats').innerHTML=`
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:20px;font-weight:700;font-family:var(--mono);">${total}</div><div style="font-size:11px;color:var(--text3);">전체</div></div>
-    <div style="background:#fff0ee;border:1px solid #f5b8b0;border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:20px;font-weight:700;font-family:var(--mono);color:#c0392b;">${inprog}</div><div style="font-size:11px;color:#c0392b;">진행중</div></div>
-    <div style="background:#eef4ff;border:1px solid #b8cef5;border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:20px;font-weight:700;font-family:var(--mono);color:#1a3a7a;">${elec}</div><div style="font-size:11px;color:#1a3a7a;">전자도어락</div></div>
-    <div style="background:#f5f0e8;border:1px solid #e0c898;border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:20px;font-weight:700;font-family:var(--mono);color:#5a3a08;">${mech}</div><div style="font-size:11px;color:#5a3a08;">기계식도어락</div></div>`;
+    <div style="background:#eef4ff;border:1px solid #b8cef5;border-radius:8px;padding:12px 14px;">
+      <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#1a3a7a;text-align:center;">${elec}</div>
+      <div style="font-size:12px;font-weight:600;color:#1a3a7a;text-align:center;margin-bottom:6px;">전자도어락</div>
+      <div style="display:flex;justify-content:center;gap:8px;">
+        <span style="font-size:11px;padding:2px 8px;border-radius:99px;background:#fff0ee;color:#c0392b;border:1px solid #f5b8b0;font-weight:600;">진행중 ${elecInprog}</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:99px;background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;font-weight:600;">완료 ${elecDone}</span>
+      </div>
+    </div>
+    <div style="background:#f5f0e8;border:1px solid #e0c898;border-radius:8px;padding:12px 14px;">
+      <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#5a3a08;text-align:center;">${mech}</div>
+      <div style="font-size:12px;font-weight:600;color:#5a3a08;text-align:center;margin-bottom:6px;">기계식도어락</div>
+      <div style="display:flex;justify-content:center;gap:8px;">
+        <span style="font-size:11px;padding:2px 8px;border-radius:99px;background:#fff0ee;color:#c0392b;border:1px solid #f5b8b0;font-weight:600;">진행중 ${mechInprog}</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:99px;background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;font-weight:600;">완료 ${mechDone}</span>
+      </div>
+    </div>`;
 
   const container=document.getElementById('issue-list');
   if(!issues.length){ container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">등록된 이슈가 없습니다</div>'; return; }
