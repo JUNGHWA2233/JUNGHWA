@@ -131,7 +131,7 @@ body.readonly .readonly-banner{display:block;}
   <!-- 오늘 할 일 메모 -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;">
     <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">📝 오늘 메모</div>
-    <textarea id="today-memo" rows="2" placeholder="오늘의 전체 메모를 입력하세요..." style="width:100%;font-size:13px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:7px 10px;background:var(--surface2);color:var(--text);resize:vertical;outline:none;" oninput="saveTodayMemo()"></textarea>
+    <textarea id="today-memo" rows="2" placeholder="오늘의 전체 메모를 입력하세요..." style="width:100%;font-size:13px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:7px 10px;background:var(--surface2);color:var(--text);resize:none;outline:none;overflow:hidden;min-height:60px;" oninput="saveTodayMemo();this.style.height='auto';this.style.height=this.scrollHeight+'px';"></textarea>
   </div>
   <div id="today-summary" style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;"></div>
   <div id="today-sheet"><div class="loading">로딩 중...</div></div>
