@@ -308,7 +308,7 @@ body.readonly .readonly-banner{display:block;}
         <select class="minput" id="im-status"><option>발주</option><option>선적</option><option>입고완료</option></select>
       </div>
       <div class="mfield"><div class="mlabel">송금</div>
-        <select class="minput" id="im-remit"><option value="">-</option><option value="o">○ 완료</option><option value="x">× 미완료</option></select>
+        <select class="minput" id="im-remit"><option value="">-</option><option value="o">완료</option><option value="x">미완료</option></select>
       </div>
     </div>
     <div class="mfield"><div class="mlabel">비고</div><textarea class="minput" id="im-note" rows="2" style="resize:vertical;"></textarea></div>
@@ -447,11 +447,16 @@ document.addEventListener('keydown',e=>{
 
 function startApp(){
   document.getElementById('today-date').textContent=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
-  // 오늘 메모 로드 (고정 키 — 직접 지우기 전까지 유지)
+  // 오늘 메모 로드 (고정 키 — 직접 지우기 전까지 유지, 구 날짜키 마이그레이션)
+  const oldKey='today-memo-'+todayStr;
+  const oldVal=localStorage.getItem(oldKey);
+  if(oldVal&&!localStorage.getItem('today-memo-persistent')){
+    localStorage.setItem('today-memo-persistent',oldVal);
+    localStorage.removeItem(oldKey);
+  }
   const savedMemo = localStorage.getItem('today-memo-persistent')||'';
   const memoEl = document.getElementById('today-memo');
-  memoEl.value=savedMemo;
-  setTimeout(()=>{ memoEl.style.height='auto'; memoEl.style.height=memoEl.scrollHeight+'px'; }, 50);
+  if(memoEl&&savedMemo){ memoEl.value=savedMemo; setTimeout(()=>{ memoEl.style.height='auto'; memoEl.style.height=memoEl.scrollHeight+'px'; }, 50); }
 
   onValue(buyersRef,snap=>{ buyers=snap.val()||{}; renderAll(); });
   onValue(query(logsRef,orderByChild('ts')),snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.reverse(); if(curPage==='history') renderHistory(); });
@@ -481,9 +486,10 @@ function renderAll(){ renderToday(); renderBuyers(); }
 
 // ── 오늘 메모 (고정 키 — 직접 지우기 전까지 유지) ──
 window.saveTodayMemo=function(){
-  const val=document.getElementById('today-memo').value;
-  localStorage.setItem('today-memo-persistent', val);
+  const el=document.getElementById('today-memo');
+  if(el) localStorage.setItem('today-memo-persistent', el.value);
 };
+window.addEventListener('beforeunload',()=>{ const el=document.getElementById('today-memo'); if(el) localStorage.setItem('today-memo-persistent',el.value); });
 
 // ── 오늘 알림 배너 ──
 async function renderTodayAlerts(){
@@ -518,8 +524,8 @@ window.renderToday=function(){
   const byBuyer=[];
   entries.forEach(([bKey,b])=>{
     const tasks=Object.entries(b.tasks||{});
-    const pending=tasks.filter(([,t])=>!t.done&&t.type==='reply-out');
-    const todayDone=tasks.filter(([,t])=>t.struckToday===todayStr&&t.type==='reply-out');
+    const pending=tasks.filter(([,t])=>!t.done&&(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr)));
+    const todayDone=tasks.filter(([,t])=>t.struckToday===todayStr&&(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr)));
     if(kw){
       const nameMatch=b.name.toLowerCase().includes(kw);
       const taskMatch=pending.some(([,t])=>t.text?.toLowerCase().includes(kw));
@@ -563,7 +569,7 @@ window.renderToday=function(){
         return `<div style="border-bottom:1px solid var(--border);">
           <div style="display:flex;align-items:center;gap:8px;padding:10px 16px 6px;background:var(--surface);">
             <span style="font-size:14px;font-weight:700;">${esc(name)}</span>
-            <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">미완료 ${pending.length}건</span>
+            <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">미완료 ${pending.filter(([,t])=>t.struckToday!==todayStr).length}건</span>
           </div>
           <div style="padding:0 16px 10px;display:flex;flex-direction:column;gap:3px;">
             ${sorted.map(([tKey,t])=>{
@@ -575,7 +581,7 @@ window.renderToday=function(){
                 <input type="checkbox" ${isStruck?'checked':''} style="width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:3px;cursor:pointer;accent-color:#2a2520;" onchange="strikeTask('${bKey}','${tKey}',this.checked)"/>
                 <div style="flex:1;">
                   <div class="tip" style="font-size:13px;color:${isStruck?'var(--text3)':isToday?'#c0392b':isOver?'#c0392b':'var(--text)'};font-weight:${isToday&&!isStruck?'700':'400'};${isStruck?'text-decoration:line-through;':''}">
-                    ${isToday&&!isStruck?'🔴 ':''}${esc(t.text)}
+                    ${t.type==='memo'&&isToday&&!isStruck?'📅 ':''}${isToday&&t.type==='reply-out'&&!isStruck?'🔴 ':''}${esc(t.text)}
                     ${tip?`<span class="tipbox">${esc(tip)}</span>`:''}
                   </div>
                   <div style="display:flex;gap:5px;margin-top:2px;flex-wrap:wrap;">
@@ -792,22 +798,29 @@ window.applyShFilter=function(){
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:95px;">바이어</th>
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:105px;">P.O#</th>
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:65px;">사이즈</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">P/I</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">선적서류</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">부킹</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">라벨지</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">면장</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">배차</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">출고</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">선적</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">B/L발송</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">P/I</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">선적서류</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">부킹</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">라벨지</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">면장</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">배차</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">출고</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">선적</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">B/L발송</th>
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);">비고</th>
     <th style="border:1px solid var(--border);width:52px;"></th>
   </tr></thead>`;
 
-  let html=''; let idx=1;
-  Object.keys(groups).sort().forEach(month=>{
-    let rows='';
+  // 완료월(모든 건 bl=o) → 하단, 미완료월 → 상단 (각각 날짜순)
+  const monthKeys=Object.keys(groups).sort();
+  const isMonthAllDone=m=>groups[m].every(s=>s.bl==='o');
+  const activeMonths=monthKeys.filter(m=>!isMonthAllDone(m));
+  const doneMonths=monthKeys.filter(m=>isMonthAllDone(m));
+  const sortedMonths=[...activeMonths,...doneMonths];
+
+  let html='';
+  sortedMonths.forEach(month=>{
+    let rows=''; let mIdx=1;
     groups[month].forEach(s=>{
       const isDone=s.shipout==='o';
       const dc=isDone?'color:#1a1916;font-weight:600;':'color:#c0392b;font-weight:700;';
@@ -816,8 +829,9 @@ window.applyShFilter=function(){
         const icon=v==='o'?'<span style="color:#165c2a;font-size:16px;font-weight:700;">○</span>':v==='d'?'<span style="color:#7a4a08;font-size:16px;">△</span>':'';
         return `<td style="text-align:center;padding:5px 3px;border:1px solid var(--border);cursor:pointer;" onclick="cycleCell('${s.key}','${col}')">${icon}</td>`;
       }).join('');
-      rows+=`<tr style="background:${isDone?'#f8f8f6':idx%2===0?'#fff':'#fafaf8'};">
-        <td style="text-align:center;padding:5px 6px;border:1px solid var(--border);font-size:12px;color:var(--text3);font-family:var(--mono);">${idx}</td>
+      const monthDone=isMonthAllDone(month);
+      rows+=`<tr style="background:${monthDone?'#f8f8f6':isDone?'#f8f8f6':mIdx%2===0?'#fff':'#fafaf8'};">
+        <td style="text-align:center;padding:5px 6px;border:1px solid var(--border);font-size:12px;color:var(--text3);font-family:var(--mono);">${mIdx}</td>
         <td style="text-align:center;padding:5px 6px;border:1px solid var(--border);font-size:11px;font-family:var(--mono);${dc}">${s.shipDate||'-'}</td>
         <td style="padding:5px 6px;border:1px solid var(--border);font-size:12px;font-weight:600;">${esc(s.buyer||'')}</td>
         <td style="padding:5px 6px;border:1px solid var(--border);font-size:11px;font-family:var(--mono);">${esc(s.po||'')}</td>
@@ -829,11 +843,12 @@ window.applyShFilter=function(){
           <button onclick="deleteSh('${s.key}')" style="font-size:11px;padding:2px 5px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--sans);">삭제</button>
         </td>
       </tr>`;
-      idx++;
+      mIdx++;
     });
+    const allDoneLabel=isMonthAllDone(month)?'<span style="font-size:11px;color:#165c2a;font-weight:600;margin-left:8px;">✅ 완료</span>':'';
     html+=`<div style="margin-bottom:24px;">
       <div style="font-size:14px;font-weight:700;color:var(--text);font-family:var(--mono);padding:6px 2px 8px;border-bottom:2px solid var(--border2);margin-bottom:8px;">
-        📅 ${month} <span style="font-size:12px;font-weight:400;color:var(--text3);">${groups[month].length}건</span>
+        📅 ${month} <span style="font-size:12px;font-weight:400;color:var(--text3);">${groups[month].length}건</span>${allDoneLabel}
       </div>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
         <table style="width:100%;border-collapse:collapse;min-width:1100px;background:var(--surface);border-radius:8px;overflow:hidden;border:1px solid var(--border);">
@@ -1094,7 +1109,7 @@ window.renderImports=function(){
     const isToday=imp.expectDate===todayStr&&imp.status!=='입고완료';
     const isOver=imp.expectDate&&imp.expectDate<todayStr&&imp.status!=='입고완료';
     const isSoon=imp.expectDate&&imp.expectDate>todayStr&&Math.floor((new Date(imp.expectDate)-new Date(todayStr))/864e5)<=7&&imp.status!=='입고완료';
-    const remitIcon=imp.remit==='o'?'<span style="font-size:12px;color:#165c2a;font-weight:700;">○</span>':imp.remit==='x'?'<span style="font-size:12px;color:#c0392b;font-weight:700;">×</span>':'<span style="font-size:12px;color:var(--text3);">-</span>';
+    const remitIcon=imp.remit==='o'?'<span style="font-size:12px;color:#165c2a;font-weight:600;">완료</span>':imp.remit==='x'?'<span style="font-size:12px;color:#c0392b;font-weight:600;">미완료</span>':'<span style="font-size:12px;color:var(--text3);">-</span>';
     return `<div style="background:var(--surface);border:1px solid ${isToday?'#c0392b':isOver?'#f5b8b0':isSoon?'#f5cc80':'var(--border)'};border-radius:10px;padding:1rem;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.5rem;gap:8px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
