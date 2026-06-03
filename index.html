@@ -128,6 +128,12 @@ body.readonly .readonly-banner{display:block;}
     </div>
   </div>
   <div id="today-alert-area"></div>
+  <!-- 검색 -->
+  <div class="search-box">
+    <span style="color:var(--text3);font-size:14px;">🔍</span>
+    <input id="today-search" type="text" placeholder="바이어명 또는 내용 검색..." oninput="renderToday()"/>
+    <button onclick="document.getElementById('today-search').value='';renderToday();" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;">✕</button>
+  </div>
   <!-- 오늘 할 일 메모 -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;">
     <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">📝 오늘 메모</div>
@@ -163,6 +169,11 @@ body.readonly .readonly-banner{display:block;}
       <button class="btn-dark no-readonly" onclick="openShModal()">+ 건 추가</button>
     </div>
   </div>
+  <div class="search-box" style="margin-bottom:1rem;">
+    <span style="color:var(--text3);font-size:14px;">🔍</span>
+    <input id="sh-search" type="text" placeholder="바이어, P.O#, 비고 검색..." oninput="applyShFilter()"/>
+    <button onclick="document.getElementById('sh-search').value='';applyShFilter();" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;">✕</button>
+  </div>
   <div id="sh-container">
     <div style="text-align:center;padding:2rem;color:var(--text3);">로딩 중...</div>
   </div>
@@ -173,6 +184,11 @@ body.readonly .readonly-banner{display:block;}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
     <div style="font-size:15px;font-weight:500;">이슈 / 불량 관리</div>
     <button class="btn-dark no-readonly" onclick="openIssueModal()">+ 이슈 등록</button>
+  </div>
+  <div class="search-box" style="margin-bottom:1rem;">
+    <span style="color:var(--text3);font-size:14px;">🔍</span>
+    <input id="issue-search" type="text" placeholder="바이어, 품목, 이슈내용 검색..." oninput="renderIssues()"/>
+    <button onclick="document.getElementById('issue-search').value='';renderIssues();" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;">✕</button>
   </div>
   <!-- 이슈 통계 -->
   <!-- 이슈 통계 카드 -->
@@ -186,6 +202,11 @@ body.readonly .readonly-banner{display:block;}
     <div style="font-size:15px;font-weight:500;">수입 건 관리</div>
     <button class="btn-dark no-readonly" onclick="openImModal()">+ 수입 건 등록</button>
   </div>
+  <div class="search-box" style="margin-bottom:1rem;">
+    <span style="color:var(--text3);font-size:14px;">🔍</span>
+    <input id="im-search" type="text" placeholder="공급처, 품목, Invoice 검색..." oninput="renderImports()"/>
+    <button onclick="document.getElementById('im-search').value='';renderImports();" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;">✕</button>
+  </div>
   <div id="im-list" style="display:flex;flex-direction:column;gap:10px;"></div>
 </div>
 
@@ -195,8 +216,9 @@ body.readonly .readonly-banner{display:block;}
     <div style="font-size:15px;font-weight:500;">저장된 일지 히스토리</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
       <select id="hist-buyer-filter" onchange="renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);"><option value="">전체 바이어</option></select>
-      <input type="date" id="hist-date-filter" onchange="renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);"/>
+      <input type="date" id="hist-date-filter" onchange="renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);" title="날짜 선택 시 해당 날짜 일지 표시"/>
       <button class="btn-dark btn-light" style="font-size:12px;padding:5px 8px;" onclick="clearHistFilter()">초기화</button>
+      <button class="btn-dark btn-light" style="font-size:12px;padding:5px 8px;" onclick="showAllHistory()">전체 보기</button>
     </div>
   </div>
   <div id="hist-sub" style="font-size:12px;color:var(--text3);margin-bottom:.75rem;"></div>
@@ -427,8 +449,8 @@ document.addEventListener('keydown',e=>{
 
 function startApp(){
   document.getElementById('today-date').textContent=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
-  // 오늘 메모 로드
-  const savedMemo = localStorage.getItem('today-memo-'+todayStr)||'';
+  // 오늘 메모 로드 (고정 키 — 직접 지우기 전까지 유지)
+  const savedMemo = localStorage.getItem('today-memo-persistent')||'';
   const memoEl = document.getElementById('today-memo');
   memoEl.value=savedMemo;
   setTimeout(()=>{ memoEl.style.height='auto'; memoEl.style.height=memoEl.scrollHeight+'px'; }, 50);
@@ -459,10 +481,10 @@ window.switchPage=function(p){
 
 function renderAll(){ renderToday(); renderBuyers(); }
 
-// ── 오늘 메모 ──
+// ── 오늘 메모 (고정 키 — 직접 지우기 전까지 유지) ──
 window.saveTodayMemo=function(){
   const val=document.getElementById('today-memo').value;
-  localStorage.setItem('today-memo-'+todayStr, val);
+  localStorage.setItem('today-memo-persistent', val);
 };
 
 // ── 오늘 알림 배너 ──
@@ -492,19 +514,25 @@ async function renderTodayAlerts(){
 // ── 오늘 할 일 ──
 window.renderToday=function(){
   renderTodayAlerts();
+  const kw=(document.getElementById('today-search')?.value||'').toLowerCase().trim();
   const entries=Object.entries(buyers);
-  let overdueCount=0, doneCount=0, pendingCount=0, replyOutCount=0;
+  let overdueCount=0, todayDoneCount=0, pendingCount=0, replyOutCount=0;
   const byBuyer=[];
   entries.forEach(([bKey,b])=>{
     const tasks=Object.entries(b.tasks||{});
-    const pending=tasks.filter(([,t])=>!t.done);
-    const done=tasks.filter(([,t])=>t.done);
-    doneCount+=done.length; pendingCount+=pending.length;
+    const pending=tasks.filter(([,t])=>!t.done&&t.type==='reply-out');
+    const todayDone=tasks.filter(([,t])=>t.struckToday===todayStr&&t.type==='reply-out');
+    if(kw){
+      const nameMatch=b.name.toLowerCase().includes(kw);
+      const taskMatch=pending.some(([,t])=>t.text?.toLowerCase().includes(kw));
+      if(!nameMatch&&!taskMatch) return;
+    }
+    todayDoneCount+=todayDone.length; pendingCount+=pending.length;
     pending.forEach(([,t])=>{
       if(t.type==='reply-out') replyOutCount++;
       if(t.dueDate&&t.dueDate<todayStr) overdueCount++;
     });
-    if(pending.length) byBuyer.push({bKey,name:b.name,pending,done});
+    if(pending.length) byBuyer.push({bKey,name:b.name,pending,todayDone});
   });
 
   document.getElementById('today-summary').innerHTML=`
@@ -525,7 +553,7 @@ window.renderToday=function(){
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);">
         <span style="font-size:13px;font-weight:500;">전체 미완료 업무</span>
-        <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">${pendingCount}건 남음 · ${doneCount}건 완료</span>
+        <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">${pendingCount}건 남음 · 오늘 완료 ${todayDoneCount}건</span>
       </div>
       ${byBuyer.map(({bKey,name,pending})=>{
         const sorted=pending.filter(([,t])=>{
@@ -544,11 +572,12 @@ window.renderToday=function(){
               const isOver=t.dueDate&&t.dueDate<todayStr;
               const isToday=t.dueDate===todayStr;
               const tip=t.author?`작성: ${t.author}${t.updatedBy?' / 수정: '+t.updatedBy:''}` :'';
-              return `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 6px;border-radius:6px;${isOver?'background:var(--overdue-bg);':''}${isToday?'background:#ffeaea;border:1px solid #f5b8b0;':''}">
-                <input type="checkbox" style="width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:3px;cursor:pointer;accent-color:#2a2520;" onchange="toggleTask('${bKey}','${tKey}',this.checked)"/>
+              const isStruck=t.struckToday===todayStr;
+              return `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 6px;border-radius:6px;${isOver&&!isStruck?'background:var(--overdue-bg);':''}${isToday&&!isStruck?'background:#ffeaea;border:1px solid #f5b8b0;':''}${isStruck?'background:#f5f5f3;opacity:.65;':''}">
+                <input type="checkbox" ${isStruck?'checked':''} style="width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:3px;cursor:pointer;accent-color:#2a2520;" onchange="strikeTask('${bKey}','${tKey}',this.checked)"/>
                 <div style="flex:1;">
-                  <div class="tip" style="font-size:13px;color:${isToday?'#c0392b':isOver?'#c0392b':'var(--text)'};font-weight:${isToday?'700':'400'};">
-                    ${isToday?'🔴 ':''}${esc(t.text)}
+                  <div class="tip" style="font-size:13px;color:${isStruck?'var(--text3)':isToday?'#c0392b':isOver?'#c0392b':'var(--text)'};font-weight:${isToday&&!isStruck?'700':'400'};${isStruck?'text-decoration:line-through;':''}">
+                    ${isToday&&!isStruck?'🔴 ':''}${esc(t.text)}
                     ${tip?`<span class="tipbox">${esc(tip)}</span>`:''}
                   </div>
                   <div style="display:flex;gap:5px;margin-top:2px;flex-wrap:wrap;">
@@ -556,7 +585,10 @@ window.renderToday=function(){
                     ${getDueLabel(t.dueDate)}
                   </div>
                 </div>
-                <button onclick="openEditTask('${bKey}','${tKey}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text3);padding:2px 4px;opacity:.5;flex-shrink:0;">✏️</button>
+                <div style="display:flex;gap:2px;flex-shrink:0;align-items:center;">
+                  <button onclick="openEditTask('${bKey}','${tKey}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text3);padding:2px 4px;opacity:.5;">✏️</button>
+                  ${isStruck?`<button onclick="deleteTask('${bKey}','${tKey}')" style="background:none;border:none;cursor:pointer;font-size:12px;color:#c0392b;padding:2px 4px;opacity:.6;" title="삭제">×</button>`:''}
+                </div>
               </div>`;
             }).join('')}
           </div>
@@ -602,7 +634,10 @@ window.renderBuyers=function(){
             <div style="font-size:13px;line-height:1.55;color:${isToday?'#c0392b':t.done?'var(--text3)':'var(--text)'};${t.done?'text-decoration:line-through;':''}">
               ${isToday?'🔴 ':''}${text}
             </div>
-            ${t.dueDate?`<div style="margin-top:2px;">${getDueLabel(t.dueDate)}</div>`:''}
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:2px;">
+              ${t.dueDate?`${getDueLabel(t.dueDate)}`:''}
+              ${t.addedDate?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);opacity:.65;">${t.addedDate} 입력</span>`:''}
+            </div>
             ${tip?`<span class="tipbox">${esc(tip)}</span>`:''}
           </div>
           <button onclick="openEditTask('${bKey}','${tKey}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text3);padding:1px 3px;opacity:.5;" title="수정">✏️</button>
@@ -683,6 +718,13 @@ window.toggleTask=async function(bKey,tKey,done){
   if(done) await set(ref(db,`buyers/${bKey}/tasks/${tKey}/updatedBy`),currentUser?.name||'');
 };
 
+// 오늘 할 일 체크 = 취소선만 (done은 false 유지, struckToday에 날짜 저장)
+window.strikeTask=async function(bKey,tKey,checked){
+  if(isRO()){ showToast('읽기 전용 계정입니다'); renderAll(); return; }
+  await set(ref(db,`buyers/${bKey}/tasks/${tKey}/struckToday`),checked?todayStr:'');
+  if(checked) await set(ref(db,`buyers/${bKey}/tasks/${tKey}/doneDate`),todayStr);
+};
+
 window.deleteTask=async function(bKey,tKey){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   await remove(ref(db,`buyers/${bKey}/tasks/${tKey}`));
@@ -736,7 +778,9 @@ window.loadShipments=async function(){
 };
 window.applyShFilter=function(){
   const fm=document.getElementById('sh-month-filter').value;
-  const filtered=fm?allSh.filter(s=>s.month===fm):[...allSh];
+  const kw=(document.getElementById('sh-search')?.value||'').toLowerCase().trim();
+  let filtered=fm?allSh.filter(s=>s.month===fm):[...allSh];
+  if(kw) filtered=filtered.filter(s=>(s.buyer||'').toLowerCase().includes(kw)||(s.po||'').toLowerCase().includes(kw)||(s.note||'').toLowerCase().includes(kw));
   document.getElementById('sh-label').textContent=`전체 출고 건 (${filtered.length}건)`;
   const container=document.getElementById('sh-container');
   if(!filtered.length){ container.innerHTML='<div style="text-align:center;padding:2rem;color:var(--text3);">등록된 출고 건이 없습니다</div>'; return; }
@@ -908,16 +952,16 @@ window.deleteIssue=async function(key){
   await loadIssues();
 };
 window.renderIssues=function(){
+  const kw=(document.getElementById('issue-search')?.value||'').toLowerCase().trim();
+  const filteredIssues=kw?issues.filter(i=>(i.buyer||'').toLowerCase().includes(kw)||(i.item||'').toLowerCase().includes(kw)||(i.desc||'').toLowerCase().includes(kw)||(i.po||'').toLowerCase().includes(kw)):issues;
   const STATUS_STYLE={'진행중':'background:#fff0ee;color:#c0392b;border:1px solid #f5b8b0;','완료':'background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;'};
   const CAT_STYLE={'전자도어락':'background:#eef4ff;color:#1a3a7a;border:1px solid #b8cef5;','기계식도어락':'background:#f5f0e8;color:#5a3a08;border:1px solid #e0c898;'};
-  const total=issues.length;
-  const elec=issues.filter(i=>i.category==='전자도어락').length;
-  const mech=issues.filter(i=>i.category==='기계식도어락').length;
-  const inprog=issues.filter(i=>i.status==='진행중').length;
-  const elecInprog=issues.filter(i=>i.category==='전자도어락'&&i.status==='진행중').length;
-  const elecDone=issues.filter(i=>i.category==='전자도어락'&&i.status==='완료').length;
-  const mechInprog=issues.filter(i=>i.category==='기계식도어락'&&i.status==='진행중').length;
-  const mechDone=issues.filter(i=>i.category==='기계식도어락'&&i.status==='완료').length;
+  const elec=filteredIssues.filter(i=>i.category==='전자도어락').length;
+  const mech=filteredIssues.filter(i=>i.category==='기계식도어락').length;
+  const elecInprog=filteredIssues.filter(i=>i.category==='전자도어락'&&i.status==='진행중').length;
+  const elecDone=filteredIssues.filter(i=>i.category==='전자도어락'&&i.status==='완료').length;
+  const mechInprog=filteredIssues.filter(i=>i.category==='기계식도어락'&&i.status==='진행중').length;
+  const mechDone=filteredIssues.filter(i=>i.category==='기계식도어락'&&i.status==='완료').length;
   document.getElementById('issue-stats').innerHTML=`
     <div style="background:#eef4ff;border:1px solid #b8cef5;border-radius:10px;padding:14px 16px;">
       <div style="font-size:13px;font-weight:700;color:#1a3a7a;margin-bottom:10px;">전자도어락 <span style="font-family:var(--mono);">${elec}건</span></div>
@@ -989,7 +1033,7 @@ window.renderIssues=function(){
   }
 
   function makeCategorySection(cat, catLabel, catColor, catBg, catBorder){
-    const catIssues = issues.filter(i=>i.category===cat);
+    const catIssues = filteredIssues.filter(i=>i.category===cat);
     if(!catIssues.length) return '';
     const inprogItems = catIssues.filter(i=>i.status==='진행중');
     const doneItems   = catIssues.filter(i=>i.status==='완료');
@@ -1013,7 +1057,11 @@ window.renderIssues=function(){
   }
 
   // 카테고리 미설정 항목
-  const etcIssues = issues.filter(i=>!i.category||i.category==='기타');
+  const etcIssues = filteredIssues.filter(i=>!i.category||i.category==='기타');
+
+  if(!filteredIssues.length){
+    container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">검색 결과가 없습니다</div>'; return;
+  }
 
   container.innerHTML=
     makeCategorySection('전자도어락','전자도어락','#1a3a7a','#eef4ff','#b8cef5') +
@@ -1039,10 +1087,12 @@ window.loadImports=async function(){
   renderImports();
 };
 window.renderImports=function(){
+  const kw=(document.getElementById('im-search')?.value||'').toLowerCase().trim();
   const STATUS_STYLE={'발주':'background:#eef4ff;color:#1a3a7a;border:1px solid #b8cef5;','선적':'background:#fff3e0;color:#e65100;border:1px solid #ffcc80;','입고완료':'background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;'};
   const container=document.getElementById('im-list');
-  if(!allIm.length){ container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">등록된 수입 건이 없습니다</div>'; return; }
-  container.innerHTML=allIm.map(imp=>{
+  const displayIm=kw?allIm.filter(i=>(i.vendor||'').toLowerCase().includes(kw)||(i.item||'').toLowerCase().includes(kw)||(i.po||'').toLowerCase().includes(kw)):allIm;
+  if(!displayIm.length){ container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">'+(kw?'검색 결과가 없습니다':'등록된 수입 건이 없습니다')+'</div>'; return; }
+  container.innerHTML=displayIm.map(imp=>{
     const isToday=imp.expectDate===todayStr&&imp.status!=='입고완료';
     const isOver=imp.expectDate&&imp.expectDate<todayStr&&imp.status!=='입고완료';
     const isSoon=imp.expectDate&&imp.expectDate>todayStr&&Math.floor((new Date(imp.expectDate)-new Date(todayStr))/864e5)<=7&&imp.status!=='입고완료';
@@ -1113,7 +1163,7 @@ window.renderHistory=function(){
   const names=[...new Set(logs.flatMap(l=>(l.buyers||[]).map(b=>b.name)))];
   sel.innerHTML='<option value="">전체 바이어</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
   sel.value=prev;
-  let filtered=logs;
+  let filtered=logs.filter(l=>l.date===todayStr);
   if(df) filtered=filtered.filter(l=>l.date===df);
   document.getElementById('hist-sub').textContent=`총 ${filtered.length}건`;
   const container=document.getElementById('hist-list');
@@ -1154,6 +1204,48 @@ window.deleteLog=async function(key){
   await remove(ref(db,'worklogs2/'+key)); showToast('히스토리 삭제됨');
 };
 window.clearHistFilter=function(){ document.getElementById('hist-buyer-filter').value=''; document.getElementById('hist-date-filter').value=''; renderHistory(); };
+window.showAllHistory=function(){ document.getElementById('hist-date-filter').value=''; renderHistoryAll(); };
+window.renderHistoryAll=function(){
+  const bf=document.getElementById('hist-buyer-filter').value;
+  const sel=document.getElementById('hist-buyer-filter');
+  const prev=sel.value;
+  const names=[...new Set(logs.flatMap(l=>(l.buyers||[]).map(b=>b.name)))];
+  sel.innerHTML='<option value="">전체 바이어</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value=prev;
+  let filtered=logs;
+  document.getElementById('hist-sub').textContent=`전체 ${filtered.length}건 (날짜별)`;
+  const container=document.getElementById('hist-list');
+  if(!filtered.length){ container.innerHTML='<div class="empty">저장된 기록이 없습니다</div>'; return; }
+  container.innerHTML=filtered.map(log=>{
+    let bs=log.buyers||[];
+    if(bf) bs=bs.filter(b=>b.name===bf);
+    if(!bs.length) return '';
+    const allT=bs.flatMap(b=>b.tasks||[]);
+    const pCnt=allT.filter(t=>!t.done).length, dCnt=allT.filter(t=>t.done).length;
+    const bHtml=bs.map(b=>{
+      const tasks=(b.tasks||[]).filter(t=>t.text);
+      if(!tasks.length) return '';
+      return `<div><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px;">${esc(b.name)}</div>
+        ${tasks.map(t=>`<div style="display:flex;align-items:flex-start;gap:6px;font-size:12px;padding:2px 0;">
+          <span style="font-size:10px;padding:1px 6px;border-radius:3px;font-weight:600;white-space:nowrap;flex-shrink:0;margin-top:1px;${TYPE_CSS[t.type]||''}">${TYPE_SHORT[t.type]||t.type}</span>
+          <span style="flex:1;line-height:1.5;${t.done?'text-decoration:line-through;opacity:.4;':''}">${esc(t.text)}</span>
+          ${t.dueDate?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;">${t.dueDate}</span>`:''}
+        </div>`).join('')}
+      </div>`;
+    }).filter(Boolean).join('');
+    if(!bHtml) return '';
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'flex':'none'">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:13px;font-weight:500;font-family:var(--mono);">${log.date}</span>
+          <span style="font-size:11px;color:var(--text3);">미완료 ${pCnt} · 완료 ${dCnt} · ${esc(log.author||'')}</span>
+        </div>
+        <button onclick="event.stopPropagation();deleteLog('${log.key}')" style="font-size:11px;padding:2px 8px;background:none;border:1px solid #f5b8b0;border-radius:4px;cursor:pointer;color:#c0392b;font-family:var(--sans);">삭제</button>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;">${bHtml}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+};
 
 // ── 일지 저장 ──
 window.saveSnapshot=async function(){
