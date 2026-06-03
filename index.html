@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>해외영업부 업무 대시보드</title>
+<title>JUNGHWA_ 해외영업부</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f5f4f0;--surface:#fff;--surface2:#f0efe9;--border:#e0ded7;--border2:#cccab8;--text:#1a1916;--text2:#6b6960;--text3:#a09e95;--accent:#2a2520;--overdue:#c0392b;--overdue-bg:#fff0ee;--mono:'DM Mono',monospace;--sans:'Noto Sans KR',sans-serif;}
@@ -202,13 +202,13 @@ body.readonly .readonly-banner{display:block;}
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px;">
     <div>
       <div style="font-size:15px;font-weight:500;">전자정 체크리스트</div>
-      <div style="font-size:12px;color:var(--text3);margin-top:2px;">출고 전 품목별 이슈 수정·보완 확인 리스트</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:2px;">제품별 · 바이어별 출고 전 수정·보완 확인 리스트</div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-      <button class="btn-dark btn-light no-readonly" onclick="openClModal()" style="font-size:12px;padding:6px 12px;">+ 품목 추가</button>
+      <button class="btn-dark btn-light no-readonly" onclick="openClProductModal()" style="font-size:12px;padding:6px 12px;">+ 제품 그룹 추가</button>
     </div>
   </div>
-  <!-- 진행률 바 -->
+  <!-- 전체 진행률 -->
   <div id="cl-progress-wrap" style="margin-bottom:1rem;display:none;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
       <span style="font-size:12px;color:var(--text2);font-weight:500;">전체 진행률</span>
@@ -220,19 +220,33 @@ body.readonly .readonly-banner{display:block;}
   </div>
   <div class="search-box">
     <span style="color:var(--text3);font-size:14px;">🔍</span>
-    <input id="cl-search" type="text" placeholder="품목명, 바이어, 내용 검색..." oninput="renderChecklist()"/>
+    <input id="cl-search" type="text" placeholder="제품명, 바이어, 내용 검색..." oninput="renderChecklist()"/>
     <button onclick="document.getElementById('cl-search').value='';renderChecklist();" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;">✕</button>
   </div>
-  <div id="cl-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+  <div id="cl-list" style="display:flex;flex-direction:column;gap:16px;"></div>
 </div>
 
-<!-- 전자정 체크리스트 품목 모달 -->
+<!-- 제품 그룹 추가/수정 모달 -->
+<div class="modal-bg" id="cl-product-modal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-title" id="cl-product-modal-title">제품 그룹 추가</div>
+    <input type="hidden" id="cl-product-key"/>
+    <div class="mfield"><div class="mlabel">제품명</div><input class="minput" id="cl-product-name" placeholder="예: Clutch Deadbolt, Electronic Lock"/></div>
+    <div class="mfield"><div class="mlabel">메모 (선택)</div><input class="minput" id="cl-product-note" placeholder="간단한 설명"/></div>
+    <div class="mactions">
+      <button class="mcancel" onclick="closeModal('cl-product-modal')">취소</button>
+      <button class="msubmit" onclick="saveClProduct()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 바이어별 체크리스트 추가/수정 모달 -->
 <div class="modal-bg" id="cl-modal">
   <div class="modal" style="max-width:500px;">
-    <div class="modal-title" id="cl-modal-title">품목 추가</div>
+    <div class="modal-title" id="cl-modal-title">바이어 체크리스트 추가</div>
     <input type="hidden" id="cl-edit-key"/>
+    <input type="hidden" id="cl-product-ref"/>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" class="grid2">
-      <div class="mfield"><div class="mlabel">품목명</div><input class="minput" id="cl-item" placeholder="Clutch Deadbolt US19"/></div>
       <div class="mfield"><div class="mlabel">바이어</div><input class="minput" id="cl-buyer" list="cl-buyers" placeholder="Cal-Royal"/>
         <datalist id="cl-buyers"><option value="Cal-Royal"><option value="Allegion"><option value="LSDA"><option value="ABS"><option value="S.Parker"><option value="VIZpin"><option value="PDQ"><option value="Korelock"></datalist>
       </div>
@@ -1220,12 +1234,17 @@ window.deleteIm=async function(key){
 };
 
 // ── 전자정 체크리스트 ──
-let allCl=[];
+// 구조: checklist_products (제품 그룹) + checklist (바이어별 항목, productKey 참조)
+let allClProducts=[], allCl=[];
+
 window.loadChecklist=async function(){
   document.getElementById('cl-list').innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">로딩 중...</div>';
-  const data=await fbGet('checklist');
+  const [pData,cData]=await Promise.all([fbGet('checklist_products'),fbGet('checklist')]);
+  allClProducts=[];
+  if(pData) Object.entries(pData).forEach(([key,val])=>allClProducts.push({key,...val}));
+  allClProducts.sort((a,b)=>(a.ts||0)-(b.ts||0));
   allCl=[];
-  if(data) Object.entries(data).forEach(([key,val])=>allCl.push({key,...val}));
+  if(cData) Object.entries(cData).forEach(([key,val])=>allCl.push({key,...val}));
   allCl.sort((a,b)=>(a.shipDate||'9999')>(b.shipDate||'9999')?1:-1);
   renderChecklist();
 };
@@ -1233,9 +1252,8 @@ window.loadChecklist=async function(){
 window.renderChecklist=function(){
   const kw=(document.getElementById('cl-search')?.value||'').toLowerCase().trim();
   const container=document.getElementById('cl-list');
-  let items=kw?allCl.filter(c=>(c.item||'').toLowerCase().includes(kw)||(c.buyer||'').toLowerCase().includes(kw)||(c.issue||'').toLowerCase().includes(kw)):allCl;
 
-  // 진행률
+  // 전체 진행률
   const totalChecks=allCl.flatMap(c=>c.checks||[]).length;
   const doneChecks=allCl.flatMap(c=>c.checks||[]).filter(ch=>ch.done).length;
   const pw=document.getElementById('cl-progress-wrap');
@@ -1245,49 +1263,92 @@ window.renderChecklist=function(){
     document.getElementById('cl-progress-bar').style.width=`${Math.round(doneChecks/totalChecks*100)}%`;
   } else { pw.style.display='none'; }
 
-  if(!items.length){
-    container.innerHTML='<div class="empty">'+(kw?'검색 결과가 없습니다':'등록된 품목이 없습니다.<br><small style="color:var(--text3);">+ 품목 추가 버튼으로 이슈 품목을 등록하세요.</small>')+'</div>';
+  if(!allClProducts.length){
+    container.innerHTML='<div class="empty">등록된 제품 그룹이 없습니다.<br><small style="color:var(--text3);">+ 제품 그룹 추가 버튼으로 시작하세요.</small></div>';
     return;
   }
 
-  container.innerHTML=items.map(cl=>{
-    const checks=cl.checks||[];
-    const doneCnt=checks.filter(ch=>ch.done).length;
-    const allDone=checks.length>0&&doneCnt===checks.length;
-    const pct=checks.length?Math.round(doneCnt/checks.length*100):0;
+  // 검색어 있으면 해당 항목 포함된 제품만
+  let productsToShow=allClProducts;
+  if(kw){
+    productsToShow=allClProducts.filter(p=>{
+      if((p.name||'').toLowerCase().includes(kw)) return true;
+      const items=allCl.filter(c=>c.productKey===p.key);
+      return items.some(c=>(c.buyer||'').toLowerCase().includes(kw)||(c.issue||'').toLowerCase().includes(kw)||(c.checks||[]).some(ch=>(ch.text||'').toLowerCase().includes(kw)));
+    });
+  }
 
-    return `<div style="background:var(--surface);border:2px solid ${allDone?'#a8d9b5':'var(--border)'};border-radius:12px;overflow:hidden;">
-      <!-- 헤더 -->
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:12px 14px 10px;background:${allDone?'#f0faf3':'var(--surface2)'};border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-            <span style="font-size:15px;font-weight:700;">${esc(cl.item||'')}</span>
-            ${cl.buyer?`<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#e8edf5;color:#2a3a5a;font-weight:600;">${esc(cl.buyer)}</span>`:''}
+  if(!productsToShow.length){
+    container.innerHTML='<div class="empty">검색 결과가 없습니다.</div>';
+    return;
+  }
+
+  container.innerHTML=productsToShow.map(prod=>{
+    const items=allCl.filter(c=>c.productKey===prod.key);
+    const filteredItems=kw?items.filter(c=>(c.buyer||'').toLowerCase().includes(kw)||(c.issue||'').toLowerCase().includes(kw)||(c.checks||[]).some(ch=>(ch.text||'').toLowerCase().includes(kw))):items;
+
+    const prodTotalChecks=items.flatMap(c=>c.checks||[]).length;
+    const prodDoneChecks=items.flatMap(c=>c.checks||[]).filter(ch=>ch.done).length;
+    const prodAllDone=prodTotalChecks>0&&prodDoneChecks===prodTotalChecks;
+    const prodPct=prodTotalChecks?Math.round(prodDoneChecks/prodTotalChecks*100):0;
+
+    const buyerCards=filteredItems.map(cl=>{
+      const checks=cl.checks||[];
+      const doneCnt=checks.filter(ch=>ch.done).length;
+      const allDone=checks.length>0&&doneCnt===checks.length;
+      const pct=checks.length?Math.round(doneCnt/checks.length*100):0;
+
+      return `<div style="background:var(--surface);border:1px solid ${allDone?'#a8d9b5':'var(--border)'};border-radius:10px;overflow:hidden;margin-bottom:8px;">
+        <!-- 바이어 헤더 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:${allDone?'#f0faf3':'var(--surface2)'};border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;">
+            <span style="font-size:14px;font-weight:700;">${esc(cl.buyer||'(바이어 미지정)')}</span>
             ${cl.po?`<span style="font-size:11px;color:var(--text3);font-family:var(--mono);">P.O# ${esc(cl.po)}</span>`:''}
+            ${cl.shipDate?`<span style="font-size:11px;color:var(--text3);font-family:var(--mono);">출고 ${esc(cl.shipDate)}</span>`:''}
             ${allDone?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#e4f2e8;color:#165c2a;font-weight:600;">✅ 완료</span>':''}
+            ${checks.length?`<span style="font-size:11px;color:var(--text3);">${doneCnt}/${checks.length}</span>`:''}
           </div>
-          ${cl.issue?`<div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:4px;">${esc(cl.issue)}</div>`:''}
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            ${cl.shipDate?`<span style="font-size:11px;color:var(--text3);font-family:var(--mono);">출고 예정 ${esc(cl.shipDate)}</span>`:''}
-            ${checks.length?`<span style="font-size:11px;color:var(--text3);">${doneCnt}/${checks.length} 완료</span>`:''}
+          <div style="display:flex;gap:5px;flex-shrink:0;">
+            <button onclick="openClModal('${cl.key}')" style="font-size:11px;padding:2px 7px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--sans);">수정</button>
+            <button onclick="deleteCl('${cl.key}')" style="font-size:11px;padding:2px 7px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--sans);">삭제</button>
           </div>
         </div>
-        <div style="display:flex;gap:5px;flex-shrink:0;">
-          <button onclick="openClModal('${cl.key}')" style="font-size:12px;padding:3px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--sans);">수정</button>
-          <button onclick="deleteCl('${cl.key}')" style="font-size:12px;padding:3px 8px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--sans);">삭제</button>
+        ${cl.issue?`<div style="padding:7px 14px;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border);background:#fafaf8;">${esc(cl.issue)}</div>`:''}
+        <!-- 진행 바 -->
+        ${checks.length?`<div style="height:3px;background:var(--surface2);"><div style="height:100%;width:${pct}%;background:${allDone?'#4caf76':'#2a2520'};transition:width .3s;"></div></div>`:''}
+        <!-- 체크 항목 -->
+        <div style="padding:8px 14px;display:flex;flex-direction:column;gap:3px;">
+          ${checks.length?checks.map((ch,i)=>`
+            <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 7px;border-radius:5px;background:${ch.done?'#f5f5f3':'transparent'};">
+              <input type="checkbox" ${ch.done?'checked':''} onchange="toggleClCheck('${cl.key}',${i},this.checked)" style="width:15px;height:15px;flex-shrink:0;margin-top:2px;cursor:pointer;accent-color:#2a2520;"/>
+              <span style="font-size:13px;flex:1;line-height:1.55;${ch.done?'text-decoration:line-through;color:var(--text3);':''}">${esc(ch.text||'')}</span>
+              ${ch.done&&ch.doneBy?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;">${esc(ch.doneBy)}</span>`:''}
+            </div>`).join('')
+          :'<div style="font-size:12px;color:var(--text3);padding:4px 0;font-style:italic;">체크 항목 없음</div>'}
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div style="background:var(--surface);border:2px solid ${prodAllDone?'#a8d9b5':'var(--border2)'};border-radius:14px;overflow:hidden;">
+      <!-- 제품 그룹 헤더 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:${prodAllDone?'#e8f7ed':'var(--surface2)'};border-bottom:2px solid ${prodAllDone?'#a8d9b5':'var(--border2)'};gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;">
+          <span style="font-size:16px;font-weight:700;">${esc(prod.name||'')}</span>
+          ${prod.note?`<span style="font-size:12px;color:var(--text2);">${esc(prod.note)}</span>`:''}
+          ${prodAllDone?'<span style="font-size:11px;padding:2px 8px;border-radius:3px;background:#e4f2e8;color:#165c2a;font-weight:600;">✅ 전체 완료</span>':''}
+          ${prodTotalChecks?`<span style="font-size:12px;color:var(--text3);font-family:var(--mono);">${prodDoneChecks}/${prodTotalChecks} (${prodPct}%)</span>`:''}
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button onclick="openClModal(null,'${prod.key}')" style="font-size:12px;padding:4px 10px;background:var(--accent);color:#f5f4f0;border:none;border-radius:5px;cursor:pointer;font-family:var(--sans);" class="no-readonly">+ 바이어 추가</button>
+          <button onclick="openClProductModal('${prod.key}')" style="font-size:12px;padding:4px 8px;background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-family:var(--sans);">수정</button>
+          <button onclick="deleteClProduct('${prod.key}')" style="font-size:12px;padding:4px 8px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--sans);">삭제</button>
         </div>
       </div>
-      <!-- 진행 바 -->
-      ${checks.length?`<div style="height:4px;background:var(--surface2);"><div style="height:100%;width:${pct}%;background:${allDone?'#4caf76':'#2a2520'};transition:width .3s;"></div></div>`:''}
-      <!-- 체크 항목 목록 -->
-      <div style="padding:10px 14px;display:flex;flex-direction:column;gap:4px;">
-        ${checks.length?checks.map((ch,i)=>`
-          <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:6px;background:${ch.done?'#f5f5f3':'var(--surface)'};border:1px solid ${ch.done?'transparent':'var(--border)'};">
-            <input type="checkbox" ${ch.done?'checked':''} onchange="toggleClCheck('${cl.key}',${i},this.checked)" style="width:15px;height:15px;flex-shrink:0;margin-top:2px;cursor:pointer;accent-color:#2a2520;"/>
-            <span style="font-size:13px;flex:1;line-height:1.55;${ch.done?'text-decoration:line-through;color:var(--text3);':''}">${esc(ch.text||'')}</span>
-            ${ch.done&&ch.doneBy?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;">${esc(ch.doneBy)}</span>`:''}
-          </div>`).join('')
-        :'<div style="font-size:12px;color:var(--text3);padding:4px 0;font-style:italic;">체크 항목이 없습니다. 수정 버튼으로 항목을 추가하세요.</div>'}
+      <!-- 전체 진행 바 -->
+      ${prodTotalChecks?`<div style="height:4px;background:var(--border);"><div style="height:100%;width:${prodPct}%;background:${prodAllDone?'#4caf76':'var(--accent)'};transition:width .4s;"></div></div>`:''}
+      <!-- 바이어별 카드 목록 -->
+      <div style="padding:12px 14px;">
+        ${filteredItems.length?buyerCards:`<div style="font-size:12px;color:var(--text3);padding:8px 0;font-style:italic;">등록된 바이어 체크리스트가 없습니다.<br>위 <b>+ 바이어 추가</b> 버튼으로 추가하세요.</div>`}
       </div>
     </div>`;
   }).join('');
@@ -1302,10 +1363,44 @@ window.toggleClCheck=async function(key,idx,done){
   await loadChecklist();
 };
 
-// 모달 내 체크 항목 추가
+// 제품 그룹 모달
+window.openClProductModal=function(key){
+  document.getElementById('cl-product-key').value=key||'';
+  document.getElementById('cl-product-modal-title').textContent=key?'제품 그룹 수정':'제품 그룹 추가';
+  if(key){
+    const p=allClProducts.find(p=>p.key===key);
+    if(p){ document.getElementById('cl-product-name').value=p.name||''; document.getElementById('cl-product-note').value=p.note||''; }
+  } else {
+    document.getElementById('cl-product-name').value='';
+    document.getElementById('cl-product-note').value='';
+  }
+  document.getElementById('cl-product-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('cl-product-name').focus(),100);
+};
+window.saveClProduct=async function(){
+  if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
+  const key=document.getElementById('cl-product-key').value;
+  const name=document.getElementById('cl-product-name').value.trim();
+  if(!name){ showToast('제품명을 입력하세요'); return; }
+  const data={name,note:document.getElementById('cl-product-note').value.trim(),ts:Date.now()};
+  if(key) await fbPatch(`checklist_products/${key}`,data);
+  else await fbPush('checklist_products',data);
+  closeModal('cl-product-modal'); showToast('저장됐습니다');
+  await loadChecklist();
+};
+window.deleteClProduct=async function(key){
+  if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
+  const items=allCl.filter(c=>c.productKey===key);
+  if(items.length&&!confirm(`이 제품 그룹과 연결된 바이어 체크리스트 ${items.length}건도 함께 삭제됩니다. 계속할까요?`)) return;
+  await fbDelete(`checklist_products/${key}`);
+  for(const c of items) await fbDelete(`checklist/${c.key}`);
+  showToast('삭제됐습니다');
+  await loadChecklist();
+};
+
+// 바이어별 체크리스트 모달
 window.addClCheckItem=function(text=''){
   const wrap=document.getElementById('cl-checks-edit');
-  const idx=wrap.children.length;
   const row=document.createElement('div');
   row.style.cssText='display:flex;gap:6px;align-items:center;';
   row.innerHTML=`<input type="text" class="minput" style="flex:1;font-size:13px;" placeholder="예: 역극성 배선 수정 확인" value="${esc(text)}"/>
@@ -1314,22 +1409,23 @@ window.addClCheckItem=function(text=''){
   row.querySelector('input').focus();
 };
 
-window.openClModal=function(key){
+window.openClModal=function(key,productKey){
   document.getElementById('cl-edit-key').value=key||'';
-  document.getElementById('cl-modal-title').textContent=key?'품목 수정':'품목 추가';
+  document.getElementById('cl-product-ref').value=productKey||'';
+  document.getElementById('cl-modal-title').textContent=key?'바이어 체크리스트 수정':'바이어 체크리스트 추가';
   document.getElementById('cl-checks-edit').innerHTML='';
   if(key){
     const cl=allCl.find(c=>c.key===key);
     if(cl){
-      document.getElementById('cl-item').value=cl.item||'';
       document.getElementById('cl-buyer').value=cl.buyer||'';
       document.getElementById('cl-po').value=cl.po||'';
       document.getElementById('cl-shipdate').value=cl.shipDate||'';
       document.getElementById('cl-issue').value=cl.issue||'';
+      document.getElementById('cl-product-ref').value=cl.productKey||'';
       (cl.checks||[]).forEach(ch=>addClCheckItem(ch.text||''));
     }
   } else {
-    ['cl-item','cl-buyer','cl-po','cl-issue'].forEach(id=>document.getElementById(id).value='');
+    ['cl-buyer','cl-po','cl-issue'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('cl-shipdate').value='';
   }
   document.getElementById('cl-modal').classList.add('open');
@@ -1338,9 +1434,8 @@ window.openClModal=function(key){
 window.saveCl=async function(){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   const key=document.getElementById('cl-edit-key').value;
-  const item=document.getElementById('cl-item').value.trim();
-  if(!item){ showToast('품목명을 입력하세요'); return; }
-  // 기존 체크 상태 유지 (수정 시 done 상태 보존)
+  const productKey=document.getElementById('cl-product-ref').value;
+  if(!productKey){ showToast('제품 그룹이 지정되지 않았습니다'); return; }
   const oldChecks=key?(allCl.find(c=>c.key===key)?.checks||[]):[];
   const rows=[...document.getElementById('cl-checks-edit').querySelectorAll('input[type=text]')];
   const checks=rows.map((inp,i)=>({
@@ -1349,7 +1444,7 @@ window.saveCl=async function(){
     doneBy:oldChecks[i]?.doneBy||'',
     doneDate:oldChecks[i]?.doneDate||''
   })).filter(ch=>ch.text);
-  const data={item,buyer:document.getElementById('cl-buyer').value.trim(),po:document.getElementById('cl-po').value.trim(),shipDate:document.getElementById('cl-shipdate').value,issue:document.getElementById('cl-issue').value.trim(),checks,ts:Date.now(),author:key?(allCl.find(c=>c.key===key)?.author||''):currentUser?.name||''};
+  const data={productKey,buyer:document.getElementById('cl-buyer').value.trim(),po:document.getElementById('cl-po').value.trim(),shipDate:document.getElementById('cl-shipdate').value,issue:document.getElementById('cl-issue').value.trim(),checks,ts:Date.now(),author:key?(allCl.find(c=>c.key===key)?.author||''):currentUser?.name||''};
   if(key) await fbSet(`checklist/${key}`,data);
   else await fbPush('checklist',data);
   closeModal('cl-modal'); showToast('저장됐습니다');
