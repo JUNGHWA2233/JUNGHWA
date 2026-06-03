@@ -300,17 +300,15 @@ body.readonly .readonly-banner{display:block;}
     <div class="modal-title" id="im-modal-title">수입 건 등록</div>
     <input type="hidden" id="im-edit-key"/>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" class="grid2">
-      <div class="mfield"><div class="mlabel">공급처</div><input class="minput" id="im-vendor" placeholder="ACL Digital"/></div>
-      <div class="mfield"><div class="mlabel">품목</div><input class="minput" id="im-item" placeholder="PCBA 1,000pcs"/></div>
+      <div class="mfield"><div class="mlabel">업체명</div><input class="minput" id="im-vendor" placeholder="ACL Digital"/></div>
+      <div class="mfield"><div class="mlabel">품명</div><input class="minput" id="im-item" placeholder="PCBA 1,000pcs"/></div>
       <div class="mfield"><div class="mlabel">발주일</div><input class="minput" id="im-order-date" type="date"/></div>
-      <div class="mfield"><div class="mlabel">출고예정일</div><input class="minput" id="im-expect-date" type="date"/></div>
-      <div class="mfield"><div class="mlabel">Invoice/PO</div><input class="minput" id="im-po" placeholder="INV-2026-001"/></div>
-      <div class="mfield"><div class="mlabel">금액(USD)</div><input class="minput" id="im-amount" placeholder="5,000.00"/></div>
-      <div class="mfield"><div class="mlabel">운송방법</div>
-        <select class="minput" id="im-ship"><option>해운(LCL)</option><option>해운(FCL)</option><option>항공</option><option>특송(FedEx)</option><option>특송(DHL)</option><option>기타</option></select>
-      </div>
+      <div class="mfield"><div class="mlabel">출항예정일</div><input class="minput" id="im-expect-date" type="date"/></div>
       <div class="mfield"><div class="mlabel">상태</div>
         <select class="minput" id="im-status"><option>발주</option><option>선적</option><option>입고완료</option></select>
+      </div>
+      <div class="mfield"><div class="mlabel">송금</div>
+        <select class="minput" id="im-remit"><option value="">-</option><option value="o">○ 완료</option><option value="x">× 미완료</option></select>
       </div>
     </div>
     <div class="mfield"><div class="mlabel">비고</div><textarea class="minput" id="im-note" rows="2" style="resize:vertical;"></textarea></div>
@@ -388,10 +386,10 @@ const issuesRef = ref(db,'issues');
 let buyers={}, logs=[], issues=[], todayTypeFilter='', issueFilter='', curPage='today';
 let currentUser=null;
 const todayStr = new Date().toISOString().split('T')[0];
-const TYPE_SHORT={'reply-out':'답변↑','memo':'메모'};
+const TYPE_SHORT={'reply-out':'회신필요','memo':'메모'};
 const TYPE_CSS={'reply-out':'background:#e8edf5;color:#2a2520;','memo':'background:#f1f0ea;color:#6b6960;'};
 const SH_COLS=['pi','docs','schedule','label','customs','dispatch','shipout','sailing','bl'];
-const SH_LABELS={'pi':'P/I','docs':'선적서류','schedule':'스케줄','label':'라벨지','customs':'면장','dispatch':'배차','shipout':'출고','sailing':'선적/매출','bl':'B/L발송'};
+const SH_LABELS={'pi':'P/I','docs':'선적서류','schedule':'부킹','label':'라벨지','customs':'면장','dispatch':'배차','shipout':'출고','sailing':'선적','bl':'B/L발송'};
 
 // ── Firebase REST API (출고일정·수입건 전용) ──
 async function fbGet(path){
@@ -537,7 +535,7 @@ window.renderToday=function(){
 
   document.getElementById('today-summary').innerHTML=`
     <div style="display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;font-size:12px;font-weight:500;border:1px solid #b8cef5;background:#eef4ff;color:#1a3a7a;cursor:pointer;" onclick="setTodayFilter('reply-out')">
-      <span style="font-family:var(--mono);font-size:13px;font-weight:700;">${replyOutCount}</span> 답변 나갈 것
+      <span style="font-family:var(--mono);font-size:13px;font-weight:700;">${replyOutCount}</span> 회신 필요
     </div>
     ${overdueCount>0?`<div style="display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;font-size:12px;font-weight:500;border:1px solid #f5b8b0;background:#fff0ee;color:#c0392b;cursor:pointer;" onclick="setTodayFilter('overdue')">
       <span style="font-family:var(--mono);font-size:13px;font-weight:700;">${overdueCount}</span> 기한 초과
@@ -614,7 +612,7 @@ window.renderBuyers=function(){
       const taskMatch=tasks.some(([,t])=>t.text?.toLowerCase().includes(kw));
       if(!nameMatch&&!taskMatch) return '';
     }
-    const pendingCnt=tasks.filter(([,t])=>!t.done&&t.type==='reply-out').length;
+    const pendingCnt=tasks.filter(([,t])=>!t.done&&t.type==='reply-out'&&t.struckToday!==todayStr).length;
 
     function makeItems(type){
       const items=tasks.filter(([,t])=>t.type===type);
@@ -673,7 +671,7 @@ window.renderBuyers=function(){
           <button class="no-readonly" onclick="deleteBuyer('${bKey}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:2px 4px;">×</button>
         </div>
       </div>
-      ${makeSection('reply-out','답변 나갈 것','#5a8acf')}
+      ${makeSection('reply-out','회신 필요','#5a8acf')}
       ${makeSection('memo','메모','#aaa')}
     </div>`;
   }).filter(Boolean).join('');
@@ -795,14 +793,14 @@ window.applyShFilter=function(){
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:105px;">P.O#</th>
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);width:65px;">사이즈</th>
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">P/I</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">선적서류</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:54px;">스케줄</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:54px;">라벨지</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">선적서류</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">부킹</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">라벨지</th>
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">면장</th>
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">배차</th>
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">출고</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:65px;">선적/매출</th>
-    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:58px;">B/L발송</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">선적</th>
+    <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);text-align:center;border:1px solid var(--border);width:46px;">B/L발송</th>
     <th style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border);">비고</th>
     <th style="border:1px solid var(--border);width:52px;"></th>
   </tr></thead>`;
@@ -1014,20 +1012,20 @@ window.renderIssues=function(){
         ${iss.date?`<div style="display:flex;flex-direction:column;gap:1px;"><div style="font-size:10px;font-weight:600;color:var(--text3);font-family:var(--mono);">발생일</div><div style="font-size:13px;font-weight:600;color:var(--text);font-family:var(--mono);">${esc(iss.date)}</div></div>`:''}
         ${iss.qty?`<div style="display:flex;flex-direction:column;gap:1px;"><div style="font-size:10px;font-weight:600;color:var(--text3);font-family:var(--mono);">수량</div><div style="font-size:13px;font-weight:600;color:var(--text);">${esc(iss.qty)}</div></div>`:''}
       </div>
-      <!-- 이슈내용 + 원인 + 조치 -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-        <div>
+      <!-- 이슈내용 + 원인 + 조치 (세로) -->
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="background:var(--surface2);border-radius:6px;padding:8px 10px;">
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">이슈 내용</div>
           <div style="font-size:13px;line-height:1.6;font-weight:500;color:var(--text);white-space:pre-wrap;">${esc(iss.desc||'')}</div>
         </div>
-        <div>
+        ${iss.cause?`<div style="background:var(--surface2);border-radius:6px;padding:8px 10px;">
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">원인 파악</div>
-          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(iss.cause||'')||'<span style="color:var(--text3);font-style:italic;">미입력</span>'}</div>
-        </div>
-        <div>
+          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(iss.cause)}</div>
+        </div>`:''}
+        ${iss.action?`<div style="background:var(--surface2);border-radius:6px;padding:8px 10px;">
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);margin-bottom:4px;">조치 내용</div>
-          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(iss.action||'')||'<span style="color:var(--text3);font-style:italic;">미입력</span>'}</div>
-        </div>
+          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(iss.action)}</div>
+        </div>`:''}
       </div>
     </div>`;
   }
@@ -1090,38 +1088,34 @@ window.renderImports=function(){
   const kw=(document.getElementById('im-search')?.value||'').toLowerCase().trim();
   const STATUS_STYLE={'발주':'background:#eef4ff;color:#1a3a7a;border:1px solid #b8cef5;','선적':'background:#fff3e0;color:#e65100;border:1px solid #ffcc80;','입고완료':'background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;'};
   const container=document.getElementById('im-list');
-  const displayIm=kw?allIm.filter(i=>(i.vendor||'').toLowerCase().includes(kw)||(i.item||'').toLowerCase().includes(kw)||(i.po||'').toLowerCase().includes(kw)):allIm;
+  const displayIm=kw?allIm.filter(i=>(i.vendor||'').toLowerCase().includes(kw)||(i.item||'').toLowerCase().includes(kw)):allIm;
   if(!displayIm.length){ container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">'+(kw?'검색 결과가 없습니다':'등록된 수입 건이 없습니다')+'</div>'; return; }
   container.innerHTML=displayIm.map(imp=>{
     const isToday=imp.expectDate===todayStr&&imp.status!=='입고완료';
     const isOver=imp.expectDate&&imp.expectDate<todayStr&&imp.status!=='입고완료';
     const isSoon=imp.expectDate&&imp.expectDate>todayStr&&Math.floor((new Date(imp.expectDate)-new Date(todayStr))/864e5)<=7&&imp.status!=='입고완료';
+    const remitIcon=imp.remit==='o'?'<span style="font-size:12px;color:#165c2a;font-weight:700;">○</span>':imp.remit==='x'?'<span style="font-size:12px;color:#c0392b;font-weight:700;">×</span>':'<span style="font-size:12px;color:var(--text3);">-</span>';
     return `<div style="background:var(--surface);border:1px solid ${isToday?'#c0392b':isOver?'#f5b8b0':isSoon?'#f5cc80':'var(--border)'};border-radius:10px;padding:1rem;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.75rem;gap:8px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.5rem;gap:8px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
           <span style="font-size:14px;font-weight:700;">${esc(imp.vendor||'')}</span>
-          <span style="font-size:12px;color:var(--text2);">${esc(imp.item||'')}</span>
           <span style="font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;${STATUS_STYLE[imp.status]||''}">${esc(imp.status)}</span>
-          ${isToday?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#fff0ee;color:#c0392b;font-weight:600;">🔴 출고예정일 당일</span>':''}
-          ${isOver?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#fff0ee;color:#c0392b;font-weight:600;">출고예정일 초과</span>':''}
-          ${isSoon&&!isOver&&!isToday?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#fdf0dc;color:#7a4a08;font-weight:600;">출고예정 임박</span>':''}
+          ${isToday?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#fff0ee;color:#c0392b;font-weight:600;">🔴 출항예정일 당일</span>':''}
+          ${isOver?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#fff0ee;color:#c0392b;font-weight:600;">출항예정일 초과</span>':''}
+          ${isSoon&&!isOver&&!isToday?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#fdf0dc;color:#7a4a08;font-weight:600;">출항예정 임박</span>':''}
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;">
           <button onclick="openImModal('${imp.key}')" style="font-size:12px;padding:3px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--sans);">수정</button>
           <button onclick="deleteIm('${imp.key}')" style="font-size:12px;padding:3px 8px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--sans);">삭제</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px;">
-        <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:2px;">Invoice/PO</div>${esc(imp.po||'-')}</div>
-        <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:2px;">금액</div>${imp.amount?'$'+esc(imp.amount):'-'}</div>
-        <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:2px;">운송</div>${esc(imp.ship||'-')}</div>
-        <div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:2px;">발주일</div>${esc(imp.orderDate||'-')}</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:.6rem;">${esc(imp.item||'')}</div>
+      <div style="display:flex;gap:16px;font-size:12px;flex-wrap:wrap;">
+        <div><span style="color:var(--text3);">발주일 </span><span style="font-weight:500;">${esc(imp.orderDate||'-')}</span></div>
+        <div><span style="color:var(--text3);">출항예정일 </span><span style="font-weight:500;${isToday||isOver?'color:#c0392b;':isSoon?'color:#e65100;':''}">${esc(imp.expectDate||'-')}</span></div>
+        <div><span style="color:var(--text3);">송금 </span>${remitIcon}</div>
       </div>
-      <div style="margin-top:8px;font-size:12px;">
-        <span style="color:var(--text3);">출고예정일 </span>
-        <span style="font-weight:500;${isToday||isOver?'color:#c0392b;':isSoon?'color:#e65100;':''}">${esc(imp.expectDate||'-')}</span>
-        ${imp.note?`<span style="color:var(--text2);margin-left:10px;">📝 ${esc(imp.note)}</span>`:''}
-      </div>
+      ${imp.note?`<div style="margin-top:6px;font-size:12px;color:var(--text2);">📝 ${esc(imp.note)}</div>`:''}
     </div>`;
   }).join('');
 };
@@ -1130,18 +1124,18 @@ window.openImModal=function(key){
   document.getElementById('im-modal-title').textContent=key?'수입 건 수정':'수입 건 등록';
   if(key){
     const imp=allIm.find(x=>x.key===key);
-    if(imp){ document.getElementById('im-vendor').value=imp.vendor||''; document.getElementById('im-item').value=imp.item||''; document.getElementById('im-po').value=imp.po||''; document.getElementById('im-amount').value=imp.amount||''; document.getElementById('im-order-date').value=imp.orderDate||''; document.getElementById('im-expect-date').value=imp.expectDate||''; document.getElementById('im-ship').value=imp.ship||'해운(LCL)'; document.getElementById('im-status').value=imp.status||'발주'; document.getElementById('im-note').value=imp.note||''; }
+    if(imp){ document.getElementById('im-vendor').value=imp.vendor||''; document.getElementById('im-item').value=imp.item||''; document.getElementById('im-order-date').value=imp.orderDate||''; document.getElementById('im-expect-date').value=imp.expectDate||''; document.getElementById('im-status').value=imp.status||'발주'; document.getElementById('im-remit').value=imp.remit||''; document.getElementById('im-note').value=imp.note||''; }
   } else {
-    ['im-vendor','im-item','im-po','im-amount','im-note'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('im-order-date').value=todayStr; document.getElementById('im-expect-date').value=''; document.getElementById('im-ship').value='해운(LCL)'; document.getElementById('im-status').value='발주';
+    ['im-vendor','im-item','im-note'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('im-order-date').value=todayStr; document.getElementById('im-expect-date').value=''; document.getElementById('im-status').value='발주'; document.getElementById('im-remit').value='';
   }
   document.getElementById('im-modal').classList.add('open');
 };
 window.saveIm=async function(){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   const key=document.getElementById('im-edit-key').value;
-  const data={vendor:document.getElementById('im-vendor').value.trim(),item:document.getElementById('im-item').value.trim(),po:document.getElementById('im-po').value.trim(),amount:document.getElementById('im-amount').value.trim(),orderDate:document.getElementById('im-order-date').value,expectDate:document.getElementById('im-expect-date').value,ship:document.getElementById('im-ship').value,status:document.getElementById('im-status').value,note:document.getElementById('im-note').value.trim(),ts:Date.now()};
-  if(!data.vendor||!data.item){ showToast('공급처와 품목은 필수입니다'); return; }
+  const data={vendor:document.getElementById('im-vendor').value.trim(),item:document.getElementById('im-item').value.trim(),orderDate:document.getElementById('im-order-date').value,expectDate:document.getElementById('im-expect-date').value,status:document.getElementById('im-status').value,remit:document.getElementById('im-remit').value,note:document.getElementById('im-note').value.trim(),ts:Date.now()};
+  if(!data.vendor||!data.item){ showToast('업체명과 품명은 필수입니다'); return; }
   if(key) await fbSet(`imports/${key}`,data);
   else await fbPush('imports',data);
   closeModal('im-modal'); showToast('저장됐습니다');
@@ -1252,7 +1246,13 @@ window.saveSnapshot=async function(){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   const entries=Object.entries(buyers);
   if(!entries.length){ showToast('저장할 데이터가 없습니다'); return; }
-  await set(push(logsRef),{ts:Date.now(),date:todayStr,author:currentUser?.name||'미지정',buyers:entries.map(([,b])=>({name:b.name,tasks:Object.values(b.tasks||{})}))});
+  // 오늘 할 일 시트 기준: reply-out 타입 중 완료 안 된 것만 저장
+  const buyersToSave=entries.map(([,b])=>({
+    name:b.name,
+    tasks:Object.values(b.tasks||{}).filter(t=>t.type==='reply-out'&&!t.done)
+  })).filter(b=>b.tasks.length);
+  if(!buyersToSave.length){ showToast('저장할 미완료 회신 건이 없습니다'); return; }
+  await set(push(logsRef),{ts:Date.now(),date:todayStr,author:currentUser?.name||'미지정',buyers:buyersToSave});
   showToast('오늘 일지 저장됨');
 };
 
@@ -1268,7 +1268,7 @@ window.downloadDocx=function(){
     ['reply-out','memo'].forEach(type=>{
       const items=tasks.filter(t=>t.type===type);
       if(!items.length) return;
-      const typeLabel={'reply-out':'답변 나갈 것','memo':'메모'};
+      const typeLabel={'reply-out':'회신 필요','memo':'메모'};
       rows.push(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr><w:p><w:r><w:rPr><w:b/><w:sz w:val="18"/></w:rPr><w:t>${xmlEsc(typeLabel[type]||type)}</w:t></w:r></w:p></w:tc></w:tr>`);
       items.forEach(t=>{ rows.push(`<w:tr><w:tc><w:tcPr><w:tcW w:w="400" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>☐</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="8960" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p></w:tc></w:tr>`); });
     });
