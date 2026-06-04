@@ -597,14 +597,14 @@ window.renderToday=function(){
   const byBuyer=[];
   entries.forEach(([bKey,b])=>{
     const tasks=Object.entries(b.tasks||{});
-    const pending=tasks.filter(([,t])=>(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr))&&(!t.done||t.struckToday===todayStr));
-    const todayDone=tasks.filter(([,t])=>t.struckToday===todayStr&&(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr)));
+    const pending=tasks.filter(([,t])=>(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr)));
+    const todayDone=tasks.filter(([,t])=>t.done&&(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr)));
     if(kw){
       const nameMatch=b.name.toLowerCase().includes(kw);
       const taskMatch=pending.some(([,t])=>t.text?.toLowerCase().includes(kw));
       if(!nameMatch&&!taskMatch) return;
     }
-    todayDoneCount+=todayDone.length; pendingCount+=pending.length;
+    todayDoneCount+=todayDone.length; pendingCount+=pending.filter(([,t])=>!t.done).length;
     pending.forEach(([,t])=>{
       if(t.type==='reply-out') replyOutCount++;
       if(t.dueDate&&t.dueDate<todayStr) overdueCount++;
@@ -651,9 +651,9 @@ window.renderToday=function(){
               const isOver=t.dueDate&&t.dueDate<todayStr;
               const isToday=t.dueDate===todayStr;
               const tip=t.author?`작성: ${t.author}${t.updatedBy?' / 수정: '+t.updatedBy:''}` :'';
-              const isStruck=t.struckToday===todayStr;
+              const isStruck=t.done===true;
               return `<div id="today-row-${bKey}-${tKey}" style="display:flex;align-items:flex-start;gap:8px;padding:4px 6px;border-radius:6px;${isOver&&!isStruck?'background:var(--overdue-bg);':''}${isToday&&!isStruck?'background:#ffeaea;border:1px solid #f5b8b0;':''}${isStruck?'background:#f5f5f3;opacity:.65;':''}">
-                <input type="checkbox" ${isStruck?'checked':''} style="width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:3px;cursor:pointer;accent-color:#2a2520;" onchange="strikeTaskWithCount('${bKey}','${tKey}',this.checked)"/>
+                <input type="checkbox" ${t.done?'checked':''} style="width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:3px;cursor:pointer;accent-color:#2a2520;" onchange="checkTask('${bKey}','${tKey}',this.checked)"/>
                 <div style="flex:1;">
                   <div class="tip" style="font-size:13px;color:${isStruck?'var(--text3)':isToday?'#c0392b':isOver?'#c0392b':'var(--text)'};font-weight:${isToday&&!isStruck?'700':'400'};${isStruck?'text-decoration:line-through;':''}">
                     ${t.type==='memo'&&isToday&&!isStruck?'📅 ':''}${isToday&&t.type==='reply-out'&&!isStruck?'🔴 ':''}${esc(t.text)}
@@ -716,7 +716,7 @@ window.renderBuyers=function(){
         const tip=t.author?`작성: ${t.author}${t.updatedBy?' / 수정: '+t.updatedBy:''}` :'';
         const text=kw&&t.text?.toLowerCase().includes(kw)?t.text.replace(new RegExp(kw,'gi'),m=>`<mark style="background:#fff176;border-radius:2px;">${m}</mark>`):esc(t.text);
         return `<div style="display:flex;align-items:flex-start;gap:7px;padding:6px 0;border-bottom:1px solid var(--border);${isToday?'background:#ffeaea;border-radius:5px;padding:6px 8px;border:1px solid #f5b8b0;margin-bottom:3px;':''}">
-          <input type="checkbox" ${(t.done||t.struckToday===todayStr)?'checked':''} onchange="toggleTask('${bKey}','${tKey}',this.checked)" style="margin-top:3px;flex-shrink:0;cursor:pointer;accent-color:#2a2520;"/>
+          <input type="checkbox" ${t.done?'checked':''} onchange="toggleTask('${bKey}','${tKey}',this.checked)" style="margin-top:3px;flex-shrink:0;cursor:pointer;accent-color:#2a2520;"/>
           <div style="flex:1;min-width:0;" class="tip">
             <div style="font-size:13px;line-height:1.55;color:${isToday?'#c0392b':t.done?'var(--text3)':'var(--text)'};${t.done?'text-decoration:line-through;':''}">
               ${isToday?'🔴 ':''}${text}
@@ -815,14 +815,8 @@ window.moveTask=async function(bKey,tKey,type,dir){
 
 window.toggleTask=async function(bKey,tKey,done){
   if(isRO()){ showToast('읽기 전용 계정입니다'); renderAll(); return; }
-  // done + struckToday + doneDate 한번에 저장 (양방향 동기화)
-  await set(ref(db,`buyers/${bKey}/tasks/${tKey}`), {
-    ...buyers[bKey]?.tasks?.[tKey],
-    done: done,
-    doneDate: done ? todayStr : '',
-    struckToday: done ? todayStr : '',
-    updatedBy: done ? (currentUser?.name||'') : (buyers[bKey]?.tasks?.[tKey]?.updatedBy||'')
-  });
+  await set(ref(db,`buyers/${bKey}/tasks/${tKey}/done`),done);
+  if(done) await set(ref(db,`buyers/${bKey}/tasks/${tKey}/updatedBy`),currentUser?.name||'');
 };
 
 // 오늘 할 일 체크 = 취소선만 (done은 false 유지, struckToday에 날짜 저장)
@@ -833,7 +827,9 @@ window.strikeTask=async function(bKey,tKey,checked){
 };
 
 // 오늘 할 일 탭 전용 - 건수 즉시반영 (화면에서 사라지지 않고 취소선만)
-window.strikeTaskWithCount=async function(bKey,tKey,checked){
+// 오늘할일 + 바이어별 공통 체크 함수
+window.checkTask=async function(bKey,tKey,checked){
+  // 건수 즉시 반영
   window._todayPendingCount=(window._todayPendingCount||0)+(checked?-1:1);
   window._todayDoneCount=(window._todayDoneCount||0)+(checked?1:-1);
   const countEl=document.getElementById('today-pending-count');
@@ -845,11 +841,14 @@ window.strikeTaskWithCount=async function(bKey,tKey,checked){
     row.style.background=checked?'#f5f5f3':'';
     const textEl=row.querySelector('.tip');
     if(textEl) textEl.style.textDecoration=checked?'line-through':'';
+    const cb=row.querySelector('input[type=checkbox]');
+    if(cb) cb.checked=checked;
   }
-  // Firebase: struckToday만 저장 (done 저장 안 함 → renderToday 재실행해도 사라지지 않음)
-  // 바이어별 탭은 struckToday===todayStr이면 완료 표시
-  await strikeTask(bKey,tKey,checked);
+  // Firebase: done 저장 → 양쪽 탭 동기화
+  await set(ref(db,`buyers/${bKey}/tasks/${tKey}/done`),checked);
+  if(checked) await set(ref(db,`buyers/${bKey}/tasks/${tKey}/updatedBy`),currentUser?.name||'');
 };
+window.strikeTaskWithCount=window.checkTask;
 
 window.deleteTask=async function(bKey,tKey){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
