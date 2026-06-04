@@ -521,10 +521,8 @@ window.renderToday=function(){
     return;
   }
 
-  // todayPendingCount: 화면에 표시된 미완료 건수 (체크 시 즉시 감소)
-  window._todayPendingCount = pendingCount;
-  window._todayDoneCount = doneCount;
-
+  window._todayPendingCount=pendingCount;
+  window._todayDoneCount=doneCount;
   document.getElementById('today-sheet').innerHTML=`
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);">
@@ -549,7 +547,7 @@ window.renderToday=function(){
               const isToday=t.dueDate===todayStr;
               const tip=t.author?`작성: ${t.author}${t.updatedBy?' / 수정: '+t.updatedBy:''}` :'';
               return `<div id="today-row-${bKey}-${tKey}" style="display:flex;align-items:flex-start;gap:8px;padding:4px 6px;border-radius:6px;${isOver?'background:var(--overdue-bg);':''}${isToday?'background:#ffeaea;border:1px solid #f5b8b0;':''}">
-                <input type="checkbox" style="width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:3px;cursor:pointer;accent-color:#2a2520;" onchange="todayCheckTask('${bKey}','${tKey}',this.checked,this)"/>
+                <input type="checkbox" style="width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:3px;cursor:pointer;accent-color:#2a2520;" onchange="todayCheckTask('${bKey}','${tKey}',this.checked)"/>
                 <div style="flex:1;">
                   <div class="tip" style="font-size:13px;color:${isToday?'#c0392b':isOver?'#c0392b':'var(--text)'};font-weight:${isToday?'700':'400'};">
                     ${isToday?'🔴 ':''}${esc(t.text)}
@@ -570,20 +568,15 @@ window.renderToday=function(){
 
 window.setTodayFilter=function(f){ todayTypeFilter=todayTypeFilter===f?'':f; renderToday(); };
 
-// 오늘 할 일 탭 전용 체크 - 건수 즉시 감소, 행 취소선 처리
-window.todayCheckTask=async function(bKey,tKey,checked,el){
-  // 즉시 UI 업데이트
+window.todayCheckTask=async function(bKey,tKey,checked){
+  // 즉시 UI 반영
   const row=document.getElementById('today-row-'+bKey+'-'+tKey);
   if(row){
-    if(checked){
-      row.style.opacity='0.4';
-      row.querySelector('div[style*="flex:1"]').style.textDecoration='line-through';
-    } else {
-      row.style.opacity='';
-      row.querySelector('div[style*="flex:1"]').style.textDecoration='';
-    }
+    row.style.opacity=checked?'0.35':'';
+    const textEl=row.querySelector('.tip');
+    if(textEl) textEl.style.textDecoration=checked?'line-through':'';
   }
-  // 건수 즉시 반영
+  // 건수 즉시 업데이트
   window._todayPendingCount=(window._todayPendingCount||0)+(checked?-1:1);
   window._todayDoneCount=(window._todayDoneCount||0)+(checked?1:-1);
   const countEl=document.getElementById('today-pending-count');
@@ -798,7 +791,6 @@ window.applyShFilter=function(){
         const v=s[col]||'';
         const icon=v==='r'?'<span style="color:#c0392b;font-size:15px;font-weight:900;">!</span>':v==='o'?'<span style="color:#165c2a;font-size:16px;font-weight:700;">○</span>':v==='d'?'<span style="color:#7a4a08;font-size:16px;">△</span>':'';
         const bgStyle=v==='r'?'background:#fff0ee;':'';
-        const dummy='';
         return `<td style="text-align:center;padding:5px 3px;border:1px solid var(--border);cursor:pointer;${bgStyle}" onclick="toggleRedFlag('${s.key}','${col}')">${icon}</td>`;
       }).join('');
       rows+=`<tr style="background:${isDone?'#f8f8f6':idx%2===0?'#fff':'#fafaf8'};">
@@ -830,18 +822,14 @@ window.applyShFilter=function(){
   container.innerHTML=html;
 };
 
-// 출고일정 셀 클릭 → 빨간 ! 표시 토글 (슬슬 처리해야 할 건 표시용)
+// 셀 클릭 → 빨간 ! 토글 (슬슬 처리해야 할 건 표시용)
 window.toggleRedFlag=async function(key,col){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   const s=allSh.find(x=>x.key===key); if(!s) return;
-  const cur=s[col]||'';
-  // r이면 해제(빈값), 아니면 r로 (기존 o/d 값은 유지하지 않고 r로 전환)
-  const next=cur==='r'?'':'r';
+  const next=(s[col]||'')==='r'?'':'r';
   await fbPatch(`shipments/${key}`,{[col]:next});
   await loadShipments();
 };
-// 수정 모달의 select에서는 o/d/빈값 그대로 저장됨 (기존 cycleCell 대체)
-window.cycleCell=window.toggleRedFlag;
 
 window.openShModal=function(key){
   document.getElementById('sh-edit-key').value=key||'';
@@ -1230,12 +1218,9 @@ window.downloadDocx=function(){
 window.closeModal=id=>document.getElementById(id).classList.remove('open');
 function getDueLabel(due){
   if(!due) return '';
-  // 시간대 오류 방지: 날짜 문자열을 직접 파싱
   const [dy,dm,dd]=due.split('-').map(Number);
   const [ty,tm,td]=todayStr.split('-').map(Number);
-  const dueDate=new Date(dy,dm-1,dd);
-  const todayDate=new Date(ty,tm-1,td);
-  const diff=Math.round((dueDate-todayDate)/864e5);
+  const diff=Math.round((new Date(dy,dm-1,dd)-new Date(ty,tm-1,td))/864e5);
   if(diff<0) return `<span class="due-badge due-over">D+${Math.abs(diff)} 초과</span>`;
   if(diff===0) return `<span class="due-badge due-soon">오늘 마감</span>`;
   if(diff<=3) return `<span class="due-badge due-soon">D-${diff} (${due})</span>`;
