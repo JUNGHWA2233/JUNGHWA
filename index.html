@@ -716,7 +716,7 @@ window.renderBuyers=function(){
         const tip=t.author?`작성: ${t.author}${t.updatedBy?' / 수정: '+t.updatedBy:''}` :'';
         const text=kw&&t.text?.toLowerCase().includes(kw)?t.text.replace(new RegExp(kw,'gi'),m=>`<mark style="background:#fff176;border-radius:2px;">${m}</mark>`):esc(t.text);
         return `<div style="display:flex;align-items:flex-start;gap:7px;padding:6px 0;border-bottom:1px solid var(--border);${isToday?'background:#ffeaea;border-radius:5px;padding:6px 8px;border:1px solid #f5b8b0;margin-bottom:3px;':''}">
-          <input type="checkbox" ${t.done?'checked':''} onchange="toggleTask('${bKey}','${tKey}',this.checked)" style="margin-top:3px;flex-shrink:0;cursor:pointer;accent-color:#2a2520;"/>
+          <input type="checkbox" ${(t.done||t.struckToday===todayStr)?'checked':''} onchange="toggleTask('${bKey}','${tKey}',this.checked)" style="margin-top:3px;flex-shrink:0;cursor:pointer;accent-color:#2a2520;"/>
           <div style="flex:1;min-width:0;" class="tip">
             <div style="font-size:13px;line-height:1.55;color:${isToday?'#c0392b':t.done?'var(--text3)':'var(--text)'};${t.done?'text-decoration:line-through;':''}">
               ${isToday?'🔴 ':''}${text}
@@ -817,6 +817,8 @@ window.toggleTask=async function(bKey,tKey,done){
   if(isRO()){ showToast('읽기 전용 계정입니다'); renderAll(); return; }
   await set(ref(db,`buyers/${bKey}/tasks/${tKey}/done`),done);
   await set(ref(db,`buyers/${bKey}/tasks/${tKey}/doneDate`),done?todayStr:'');
+  // 바이어별 체크 → 오늘 할 일에도 반영 (struckToday 동기화)
+  await set(ref(db,`buyers/${bKey}/tasks/${tKey}/struckToday`),done?todayStr:'');
   if(done) await set(ref(db,`buyers/${bKey}/tasks/${tKey}/updatedBy`),currentUser?.name||'');
 };
 
@@ -841,9 +843,9 @@ window.strikeTaskWithCount=async function(bKey,tKey,checked){
     const textEl=row.querySelector('.tip');
     if(textEl) textEl.style.textDecoration=checked?'line-through':'';
   }
-  // Firebase: struckToday + 바이어별 done 동시 저장
+  // Firebase: struckToday만 저장 (done 저장 안 함 → renderToday 재실행해도 사라지지 않음)
+  // 바이어별 탭은 struckToday===todayStr이면 완료 표시
   await strikeTask(bKey,tKey,checked);
-  await set(ref(db,`buyers/${bKey}/tasks/${tKey}/done`),checked);
 };
 
 window.deleteTask=async function(bKey,tKey){
