@@ -597,7 +597,7 @@ window.renderToday=function(){
   const byBuyer=[];
   entries.forEach(([bKey,b])=>{
     const tasks=Object.entries(b.tasks||{});
-    const pending=tasks.filter(([,t])=>!t.done&&(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr)));
+    const pending=tasks.filter(([,t])=>(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr))&&(!t.done||t.struckToday===todayStr));
     const todayDone=tasks.filter(([,t])=>t.struckToday===todayStr&&(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr)));
     if(kw){
       const nameMatch=b.name.toLowerCase().includes(kw);
@@ -827,15 +827,23 @@ window.strikeTask=async function(bKey,tKey,checked){
   if(checked) await set(ref(db,`buyers/${bKey}/tasks/${tKey}/doneDate`),todayStr);
 };
 
-// 오늘 할 일 탭 전용 - 건수 즉시반영
+// 오늘 할 일 탭 전용 - 건수 즉시반영 (화면에서 사라지지 않고 취소선만)
 window.strikeTaskWithCount=async function(bKey,tKey,checked){
   window._todayPendingCount=(window._todayPendingCount||0)+(checked?-1:1);
   window._todayDoneCount=(window._todayDoneCount||0)+(checked?1:-1);
   const countEl=document.getElementById('today-pending-count');
   if(countEl) countEl.textContent=`${window._todayPendingCount}건 남음 · 오늘 완료 ${window._todayDoneCount}건`;
-  // struckToday + done 동시 저장 → 바이어별 탭에도 반영
+  // UI: 취소선+흐리게 (사라지지 않음)
+  const row=document.getElementById('today-row-'+bKey+'-'+tKey);
+  if(row){
+    row.style.opacity=checked?'0.45':'';
+    row.style.background=checked?'#f5f5f3':'';
+    const textEl=row.querySelector('.tip');
+    if(textEl) textEl.style.textDecoration=checked?'line-through':'';
+  }
+  // Firebase: struckToday + 바이어별 done 동시 저장
   await strikeTask(bKey,tKey,checked);
-  await toggleTask(bKey,tKey,checked);
+  await set(ref(db,`buyers/${bKey}/tasks/${tKey}/done`),checked);
 };
 
 window.deleteTask=async function(bKey,tKey){
