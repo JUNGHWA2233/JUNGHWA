@@ -574,7 +574,7 @@ async function renderTodayAlerts(){
     const shData=await fbGet('shipments');
     if(shData) Object.values(shData).forEach(s=>{
       if(s.shipDate===todayStr&&s.shipout!=='o')
-        alerts.push(`🚢 <b>출고일정</b> — ${esc(s.buyer||'')} / ${esc(s.po||'')} 출고 당일`);
+        alerts.push(`🚢 <b>출고일정</b> — ${esc(s.buyer||'')} / ${esc(s.po||'')}${s.size?' ('+esc(s.size)+')':''} 출고 당일`);
     });
     const imData=await fbGet('imports');
     if(imData) Object.values(imData).forEach(imp=>{
