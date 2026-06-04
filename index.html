@@ -565,7 +565,7 @@ window.saveTodayMemo=function(){
 window.addEventListener('beforeunload',()=>{ const el=document.getElementById('today-memo'); if(el) localStorage.setItem('today-memo-persistent',el.value); });
 
 // ── 오늘 알림 배너 ──
-async function renderTodayAlerts(){
+async async function renderTodayAlerts(){
   const area=document.getElementById('today-alert-area');
   if(!area) return;
   const alerts=[];
@@ -589,8 +589,8 @@ async function renderTodayAlerts(){
 }
 
 // ── 오늘 할 일 ──
-window.renderToday=function(){
-  renderTodayAlerts();
+window.renderToday=async function(){
+  await renderTodayAlerts();
   const kw=(document.getElementById('today-search')?.value||'').toLowerCase().trim();
   const entries=Object.entries(buyers);
   let overdueCount=0, todayDoneCount=0, pendingCount=0, replyOutCount=0;
