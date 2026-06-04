@@ -815,11 +815,14 @@ window.moveTask=async function(bKey,tKey,type,dir){
 
 window.toggleTask=async function(bKey,tKey,done){
   if(isRO()){ showToast('읽기 전용 계정입니다'); renderAll(); return; }
-  await set(ref(db,`buyers/${bKey}/tasks/${tKey}/done`),done);
-  await set(ref(db,`buyers/${bKey}/tasks/${tKey}/doneDate`),done?todayStr:'');
-  // 바이어별 체크 → 오늘 할 일에도 반영 (struckToday 동기화)
-  await set(ref(db,`buyers/${bKey}/tasks/${tKey}/struckToday`),done?todayStr:'');
-  if(done) await set(ref(db,`buyers/${bKey}/tasks/${tKey}/updatedBy`),currentUser?.name||'');
+  // done + struckToday + doneDate 한번에 저장 (양방향 동기화)
+  await set(ref(db,`buyers/${bKey}/tasks/${tKey}`), {
+    ...buyers[bKey]?.tasks?.[tKey],
+    done: done,
+    doneDate: done ? todayStr : '',
+    struckToday: done ? todayStr : '',
+    updatedBy: done ? (currentUser?.name||'') : (buyers[bKey]?.tasks?.[tKey]?.updatedBy||'')
+  });
 };
 
 // 오늘 할 일 체크 = 취소선만 (done은 false 유지, struckToday에 날짜 저장)
