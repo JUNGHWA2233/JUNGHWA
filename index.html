@@ -644,7 +644,7 @@ window.renderToday=function(){
         return `<div style="border-bottom:1px solid var(--border);">
           <div style="display:flex;align-items:center;gap:8px;padding:10px 16px 6px;background:var(--surface);">
             <span style="font-size:14px;font-weight:700;">${esc(name)}</span>
-            <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">미완료 ${pending.filter(([,t])=>t.struckToday!==todayStr).length}건</span>
+            <span style="font-size:11px;color:var(--text3);font-family:var(--mono);" id="buyer-pending-${bKey}">미완료 ${pending.filter(([,t])=>!t.done).length}건</span>
           </div>
           <div style="padding:0 16px 10px;display:flex;flex-direction:column;gap:3px;">
             ${sorted.map(([tKey,t])=>{
@@ -829,11 +829,17 @@ window.strikeTask=async function(bKey,tKey,checked){
 // 오늘 할 일 탭 전용 - 건수 즉시반영 (화면에서 사라지지 않고 취소선만)
 // 오늘할일 + 바이어별 공통 체크 함수
 window.checkTask=async function(bKey,tKey,checked){
-  // 건수 즉시 반영
+  // 전체 건수 즉시 반영
   window._todayPendingCount=(window._todayPendingCount||0)+(checked?-1:1);
   window._todayDoneCount=(window._todayDoneCount||0)+(checked?1:-1);
   const countEl=document.getElementById('today-pending-count');
   if(countEl) countEl.textContent=`${window._todayPendingCount}건 남음 · 오늘 완료 ${window._todayDoneCount}건`;
+  // 바이어별 미완료 건수 즉시 반영
+  const buyerCountEl=document.getElementById('buyer-pending-'+bKey);
+  if(buyerCountEl){
+    const cur=parseInt(buyerCountEl.textContent)||0;
+    buyerCountEl.textContent=`미완료 ${Math.max(0,cur+(checked?-1:1))}건`;
+  }
   // UI: 취소선+흐리게 (사라지지 않음)
   const row=document.getElementById('today-row-'+bKey+'-'+tKey);
   if(row){
