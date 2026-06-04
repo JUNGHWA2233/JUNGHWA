@@ -457,7 +457,7 @@ const issuesRef = ref(db,'issues');
 
 let buyers={}, logs=[], issues=[], todayTypeFilter='', issueFilter='', curPage='today';
 let currentUser=null;
-const todayStr = new Date().toISOString().split('T')[0];
+let todayStr = new Date().toLocaleDateString('sv-SE'); // 매번 갱신되도록 let으로
 const TYPE_SHORT={'reply-out':'회신필요','memo':'메모'};
 const TYPE_CSS={'reply-out':'background:#e8edf5;color:#2a2520;','memo':'background:#f1f0ea;color:#6b6960;'};
 const SH_COLS=['pi','docs','schedule','label','customs','dispatch','shipout','sailing','bl'];
@@ -518,6 +518,7 @@ document.addEventListener('keydown',e=>{
 });
 
 function startApp(){
+  todayStr = new Date().toLocaleDateString('sv-SE'); // 날짜 갱신
   document.getElementById('today-date').textContent=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   // 오늘 메모 로드 (고정 키 — 직접 지우기 전까지 유지, 구 날짜키 마이그레이션)
   const oldKey='today-memo-'+todayStr;
@@ -555,7 +556,7 @@ window.switchPage=function(p){
   if(p==='checklist') loadChecklist();
 };
 
-function renderAll(){ renderToday(); renderBuyers(); }
+async function renderAll(){ todayStr=new Date().toLocaleDateString('sv-SE'); await renderToday(); renderBuyers(); }
 
 // ── 오늘 메모 (고정 키 — 직접 지우기 전까지 유지) ──
 window.saveTodayMemo=function(){
