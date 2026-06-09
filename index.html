@@ -521,15 +521,12 @@ function startApp(){
   todayStr = new Date().toLocaleDateString('sv-SE'); // 날짜 갱신
   document.getElementById('today-date').textContent=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   // 오늘 메모 로드 (고정 키 — 직접 지우기 전까지 유지, 구 날짜키 마이그레이션)
-  const oldKey='today-memo-'+todayStr;
-  const oldVal=localStorage.getItem(oldKey);
-  if(oldVal&&!localStorage.getItem('today-memo-persistent')){
-    localStorage.setItem('today-memo-persistent',oldVal);
-    localStorage.removeItem(oldKey);
-  }
-  const savedMemo = localStorage.getItem('today-memo-persistent')||'';
-  const memoEl = document.getElementById('today-memo');
-  if(memoEl&&savedMemo){ memoEl.value=savedMemo; setTimeout(()=>{ memoEl.style.height='auto'; memoEl.style.height=memoEl.scrollHeight+'px'; }, 50); }
+  // Firebase에서 오늘 메모 로드 (모든 기기 공유)
+  get(ref(db,'todayMemo/'+todayStr)).then(snap=>{
+    const savedMemo=snap.val()||'';
+    const memoEl=document.getElementById('today-memo');
+    if(memoEl){ memoEl.value=savedMemo; setTimeout(()=>{ memoEl.style.height='auto'; memoEl.style.height=memoEl.scrollHeight+'px'; },50); }
+  });
 
   onValue(buyersRef,snap=>{ buyers=snap.val()||{}; renderAll(); });
   onValue(query(logsRef,orderByChild('ts')),snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.reverse(); if(curPage==='history') renderHistory(); });
@@ -561,7 +558,8 @@ async function renderAll(){ todayStr=new Date().toLocaleDateString('sv-SE'); awa
 // ── 오늘 메모 (고정 키 — 직접 지우기 전까지 유지) ──
 window.saveTodayMemo=function(){
   const el=document.getElementById('today-memo');
-  if(el) localStorage.setItem('today-memo-persistent', el.value);
+  if(!el) return;
+  set(ref(db,'todayMemo/'+todayStr), el.value||'');
 };
 window.addEventListener('beforeunload',()=>{ const el=document.getElementById('today-memo'); if(el) localStorage.setItem('today-memo-persistent',el.value); });
 
