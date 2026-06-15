@@ -521,11 +521,14 @@ function startApp(){
   todayStr = new Date().toLocaleDateString('sv-SE'); // 날짜 갱신
   document.getElementById('today-date').textContent=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   // 오늘 메모 로드 (고정 키 — 직접 지우기 전까지 유지, 구 날짜키 마이그레이션)
-  // Firebase에서 오늘 메모 로드 (모든 기기 공유)
-  get(ref(db,'todayMemo/'+todayStr)).then(snap=>{
-    const savedMemo=snap.val()||'';
+  // Firebase에서 오늘 메모 로드 (모든 기기 공유, 값 있을 때만 덮어씀)
+  get(ref(db,'todayMemo/persistent')).then(snap=>{
+    const savedMemo=snap.val();
     const memoEl=document.getElementById('today-memo');
-    if(memoEl){ memoEl.value=savedMemo; setTimeout(()=>{ memoEl.style.height='auto'; memoEl.style.height=memoEl.scrollHeight+'px'; },50); }
+    if(memoEl && savedMemo !== null && savedMemo !== undefined){
+      memoEl.value=savedMemo;
+      setTimeout(()=>{ memoEl.style.height='auto'; memoEl.style.height=memoEl.scrollHeight+'px'; },50);
+    }
   });
 
   onValue(buyersRef,snap=>{ buyers=snap.val()||{}; renderAll(); });
@@ -559,7 +562,7 @@ async function renderAll(){ todayStr=new Date().toLocaleDateString('sv-SE'); awa
 window.saveTodayMemo=function(){
   const el=document.getElementById('today-memo');
   if(!el) return;
-  set(ref(db,'todayMemo/'+todayStr), el.value||'');
+  set(ref(db,'todayMemo/persistent'), el.value||'');
 };
 window.addEventListener('beforeunload',()=>{ const el=document.getElementById('today-memo'); if(el) localStorage.setItem('today-memo-persistent',el.value); });
 
