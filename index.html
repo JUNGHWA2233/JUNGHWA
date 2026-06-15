@@ -525,8 +525,9 @@ function startApp(){
   get(ref(db,'todayMemo/persistent')).then(snap=>{
     const savedMemo=snap.val();
     const memoEl=document.getElementById('today-memo');
-    if(memoEl && savedMemo !== null && savedMemo !== undefined){
-      memoEl.value=savedMemo;
+    if(memoEl){
+      if(savedMemo !== null && savedMemo !== undefined) memoEl.value=savedMemo;
+      memoEl.dataset.loaded='1'; // 로드 완료 표시
       setTimeout(()=>{ memoEl.style.height='auto'; memoEl.style.height=memoEl.scrollHeight+'px'; },50);
     }
   });
@@ -561,8 +562,8 @@ async function renderAll(){ todayStr=new Date().toLocaleDateString('sv-SE'); awa
 // ── 오늘 메모 (고정 키 — 직접 지우기 전까지 유지) ──
 window.saveTodayMemo=function(){
   const el=document.getElementById('today-memo');
-  if(!el) return;
-  set(ref(db,'todayMemo/persistent'), el.value||'');
+  if(!el||!el.dataset.loaded) return; // 로드 완료 전엔 저장 안 함
+  set(ref(db,'todayMemo/persistent'), el.value);
 };
 window.addEventListener('beforeunload',()=>{ const el=document.getElementById('today-memo'); if(el) localStorage.setItem('today-memo-persistent',el.value); });
 
