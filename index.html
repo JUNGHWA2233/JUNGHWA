@@ -861,7 +861,8 @@ window.strikeTaskWithCount=window.checkTask;
 
 window.deleteTask=async function(bKey,tKey){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
-  await remove(ref(db,`buyers/${bKey}/tasks/${tKey}`));
+
+  if(!confirm('삭제하시겠습니까?')) return;  await remove(ref(db,`buyers/${bKey}/tasks/${tKey}`));
 };
 
 window.moveBuyer=async function(bKey,dir){
@@ -876,7 +877,8 @@ window.moveBuyer=async function(bKey,dir){
 
 window.deleteBuyer=async function(bKey){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
-  if(!confirm('이 바이어를 삭제할까요?')) return;
+
+  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('이 바이어를 삭제할까요?')) return;
   await remove(ref(db,`buyers/${bKey}`));
 };
 
@@ -1052,7 +1054,8 @@ window.saveSh=async function(){
 
 window.deleteSh=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
-  if(!confirm('삭제할까요?')) return;
+
+  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('삭제할까요?')) return;
   await fbDelete(`shipments/${key}`);
   showToast('삭제됐습니다');
   await loadShipments();
@@ -1114,7 +1117,8 @@ window.moveIssue=async function(key,dir){
 
 window.deleteIssue=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
-  if(!confirm('삭제할까요?')) return;
+
+  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('삭제할까요?')) return;
   await remove(ref(db,'issues/'+key));
   await loadIssues();
 };
@@ -1326,7 +1330,8 @@ window.moveIm=async function(key,dir){
 
 window.deleteIm=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
-  if(!confirm('삭제할까요?')) return;
+
+  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('삭제할까요?')) return;
   await fbDelete(`imports/${key}`); showToast('삭제됐습니다');
   await loadImports();
 };
@@ -1510,7 +1515,8 @@ window.saveClProduct=async function(){
 
 window.deleteClProduct=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
-  const items=allCl.filter(c=>c.productKey===key);
+
+  if(!confirm('삭제하시겠습니까?')) return;  const items=allCl.filter(c=>c.productKey===key);
   const msg=items.length?`이 제품과 연결된 바이어 체크리스트 ${items.length}건도 함께 삭제됩니다. 삭제할까요?`:'삭제할까요?';
   if(!confirm(msg)) return;
   await fbDelete(`checklist_products/${key}`);
@@ -1577,7 +1583,8 @@ window.saveCl=async function(){
 
 window.deleteCl=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
-  if(!confirm('삭제할까요?')) return;
+
+  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('삭제할까요?')) return;
   await fbDelete(`checklist/${key}`); showToast('삭제됐습니다');
   await loadChecklist();
 };
