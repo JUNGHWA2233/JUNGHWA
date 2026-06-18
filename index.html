@@ -582,6 +582,12 @@ async function renderTodayAlerts(){
     if(imData) Object.values(imData).forEach(imp=>{
       if(imp.expectDate===todayStr&&imp.status!=='입고완료')
         alerts.push(`📥 <b>수입 건</b> — ${esc(imp.vendor||'')} / ${esc(imp.item||'')} 출고예정일 당일`);
+      // 입고완료 후 2주 지났는데 송금 미완료인 경우
+      if(imp.status==='입고완료'&&imp.doneDate&&imp.remit!=='o'){
+        const diffDays=Math.floor((new Date(todayStr)-new Date(imp.doneDate))/864e5);
+        if(diffDays>=14)
+          alerts.push(`💰 <b>송금 필요</b> — ${esc(imp.vendor||'')} / ${esc(imp.item||'')} (입고일 ${esc(imp.doneDate)}, ${diffDays}일 경과) 송금 미완료`);
+      }
     });
   }catch(e){}
   if(!alerts.length){ area.innerHTML=''; return; }
@@ -1263,23 +1269,19 @@ window.renderImports=function(){
   const kw=(document.getElementById('im-search')?.value||'').toLowerCase().trim();
   const STATUS_STYLE={'발주':'background:#eef4ff;color:#1a3a7a;border:1px solid #b8cef5;','선적':'background:#fff3e0;color:#e65100;border:1px solid #ffcc80;','입고완료':'background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;'};
   const container=document.getElementById('im-list');
-  let displayIm=kw?allIm.filter(i=>(i.vendor||'').toLowerCase().includes(kw)||(i.item||'').toLowerCase().includes(kw)):allIm.slice();
-  // 정렬: 미완료(출고예정일 임박순) 먼저, 입고완료는 맨 아래로
-  displayIm=displayIm.slice().sort((a,b)=>{
-    const aDone=a.status==='입고완료', bDone=b.status==='입고완료';
-    if(aDone!==bDone) return aDone?1:-1; // 완료된건 아래로
-    if(!aDone){
-      // 미완료: 출항예정일 빠른 순(임박한 순)
-      const aDate=a.expectDate||'9999-99-99';
-      const bDate=b.expectDate||'9999-99-99';
-      return aDate<bDate?-1:aDate>bDate?1:0;
-    }
-    // 완료된 것들끼리는 기존 순서 유지
-    return 0;
+  const filtered=kw?allIm.filter(i=>(i.vendor||'').toLowerCase().includes(kw)||(i.item||'').toLowerCase().includes(kw)):allIm.slice();
+  if(!filtered.length){ container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">'+(kw?'검색 결과가 없습니다':'등록된 수입 건이 없습니다')+'</div>'; return; }
+
+  const pendingList=filtered.filter(i=>i.status!=='입고완료').sort((a,b)=>{
+    const aDate=a.expectDate||'9999-99-99', bDate=b.expectDate||'9999-99-99';
+    return aDate<bDate?-1:aDate>bDate?1:0;
   });
-  if(!displayIm.length){ container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">'+(kw?'검색 결과가 없습니다':'등록된 수입 건이 없습니다')+'</div>'; return; }
-  container.innerHTML=displayIm.map((imp,impIdx)=>{
-    const isDone=imp.status==='입고완료';
+  const doneList=filtered.filter(i=>i.status==='입고완료').sort((a,b)=>{
+    const aDate=a.doneDate||a.orderDate||'0000-00-00', bDate=b.doneDate||b.orderDate||'0000-00-00';
+    return aDate>bDate?-1:aDate<bDate?1:0; // 최신순(내림차순)
+  });
+
+  const renderCard=(imp,impIdx,arr,isDone)=>{
     const isToday=imp.expectDate===todayStr&&!isDone;
     const isOver=imp.expectDate&&imp.expectDate<todayStr&&!isDone;
     const isSoon=imp.expectDate&&imp.expectDate>todayStr&&Math.floor((new Date(imp.expectDate)-new Date(todayStr))/864e5)<=7&&!isDone;
@@ -1294,8 +1296,6 @@ window.renderImports=function(){
           ${isSoon&&!isOver&&!isToday?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#fdf0dc;color:#7a4a08;font-weight:600;">출항예정 임박</span>':''}
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">
-          <button onclick="moveIm('${imp.key}',-1)" class="order-btn no-readonly" ${impIdx===0?'disabled':''}>▲</button>
-          <button onclick="moveIm('${imp.key}',1)" class="order-btn no-readonly" ${impIdx===displayIm.length-1?'disabled':''}>▼</button>
           <button onclick="openImModal('${imp.key}')" style="font-size:12px;padding:3px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--sans);margin-left:3px;">수정</button>
           <button onclick="deleteIm('${imp.key}')" style="font-size:12px;padding:3px 8px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--sans);">삭제</button>
         </div>
@@ -1304,11 +1304,24 @@ window.renderImports=function(){
       <div style="display:flex;gap:16px;font-size:12px;flex-wrap:wrap;">
         <div><span style="color:var(--text3);">발주일 </span><span style="font-weight:500;">${esc(imp.orderDate||'-')}</span></div>
         <div><span style="color:var(--text3);">출항예정일 </span><span style="font-weight:500;${isToday||isOver?'color:#c0392b;':isSoon?'color:#e65100;':''}">${esc(imp.expectDate||'-')}</span></div>
+        ${isDone?`<div><span style="color:var(--text3);">입고일 </span><span style="font-weight:500;">${esc(imp.doneDate||'-')}</span></div>`:''}
         <div><span style="color:var(--text3);">송금 </span>${remitIcon}</div>
       </div>
       ${imp.note?`<div style="margin-top:6px;font-size:12px;color:var(--text2);">📝 ${esc(imp.note)}</div>`:''}
     </div>`;
-  }).join('');
+  };
+
+  let html='';
+  html+=`<div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">📦 입고 예정 (${pendingList.length}건)</div>`;
+  html+=pendingList.length
+    ? `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:1.5rem;">${pendingList.map((imp,i)=>renderCard(imp,i,pendingList,false)).join('')}</div>`
+    : `<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:13px;margin-bottom:1.5rem;">입고 예정 건이 없습니다</div>`;
+  html+=`<div style="font-size:13px;font-weight:700;color:var(--text3);margin-bottom:8px;border-top:1px solid var(--border);padding-top:1rem;">✅ 입고 완료 (${doneList.length}건)</div>`;
+  html+=doneList.length
+    ? `<div style="display:flex;flex-direction:column;gap:10px;">${doneList.map((imp,i)=>renderCard(imp,i,doneList,true)).join('')}</div>`
+    : `<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:13px;">입고 완료된 건이 없습니다</div>`;
+
+  container.innerHTML=html;
 };
 window.openImModal=function(key){
   document.getElementById('im-edit-key').value=key||'';
@@ -1325,7 +1338,12 @@ window.openImModal=function(key){
 window.saveIm=async function(){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   const key=document.getElementById('im-edit-key').value;
-  const data={vendor:document.getElementById('im-vendor').value.trim(),item:document.getElementById('im-item').value.trim(),orderDate:document.getElementById('im-order-date').value,expectDate:document.getElementById('im-expect-date').value,status:document.getElementById('im-status').value,remit:document.getElementById('im-remit').value,note:document.getElementById('im-note').value.trim(),ts:Date.now()};
+  const status=document.getElementById('im-status').value;
+  const prev=key?allIm.find(x=>x.key===key):null;
+  // 입고완료로 바뀌는 순간 입고일 자동 기록, 그 외 상태면 입고일 제거
+  let doneDate='';
+  if(status==='입고완료') doneDate=(prev&&prev.status==='입고완료'&&prev.doneDate)?prev.doneDate:todayStr;
+  const data={vendor:document.getElementById('im-vendor').value.trim(),item:document.getElementById('im-item').value.trim(),orderDate:document.getElementById('im-order-date').value,expectDate:document.getElementById('im-expect-date').value,status:status,doneDate:doneDate,remit:document.getElementById('im-remit').value,note:document.getElementById('im-note').value.trim(),ts:Date.now()};
   if(!data.vendor||!data.item){ showToast('업체명과 품명은 필수입니다'); return; }
   if(key) await fbSet(`imports/${key}`,data);
   else await fbPush('imports',data);
