@@ -379,6 +379,7 @@ body.readonly .readonly-banner{display:block;}
       <div class="mfield"><div class="mlabel">상태</div>
         <select class="minput" id="im-status"><option>발주</option><option>선적</option><option>입고완료</option></select>
       </div>
+      <div class="mfield"><div class="mlabel">입고일</div><input class="minput" id="im-done-date" type="date"/></div>
       <div class="mfield"><div class="mlabel">송금</div>
         <select class="minput" id="im-remit"><option value="">-</option><option value="o">완료</option><option value="x">미완료</option></select>
       </div>
@@ -1335,10 +1336,10 @@ window.openImModal=function(key){
   document.getElementById('im-modal-title').textContent=key?'수입 건 수정':'수입 건 등록';
   if(key){
     const imp=allIm.find(x=>x.key===key);
-    if(imp){ document.getElementById('im-vendor').value=imp.vendor||''; document.getElementById('im-item').value=imp.item||''; document.getElementById('im-order-date').value=imp.orderDate||''; document.getElementById('im-expect-date').value=imp.expectDate||''; document.getElementById('im-status').value=imp.status||'발주'; document.getElementById('im-remit').value=imp.remit||''; document.getElementById('im-note').value=imp.note||''; }
+    if(imp){ document.getElementById('im-vendor').value=imp.vendor||''; document.getElementById('im-item').value=imp.item||''; document.getElementById('im-order-date').value=imp.orderDate||''; document.getElementById('im-expect-date').value=imp.expectDate||''; document.getElementById('im-status').value=imp.status||'발주'; document.getElementById('im-done-date').value=imp.doneDate||''; document.getElementById('im-remit').value=imp.remit||''; document.getElementById('im-note').value=imp.note||''; }
   } else {
     ['im-vendor','im-item','im-note'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('im-order-date').value=todayStr; document.getElementById('im-expect-date').value=''; document.getElementById('im-status').value='발주'; document.getElementById('im-remit').value='';
+    document.getElementById('im-order-date').value=todayStr; document.getElementById('im-expect-date').value=''; document.getElementById('im-status').value='발주'; document.getElementById('im-done-date').value=''; document.getElementById('im-remit').value='';
   }
   document.getElementById('im-modal').classList.add('open');
 };
@@ -1346,10 +1347,7 @@ window.saveIm=async function(){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   const key=document.getElementById('im-edit-key').value;
   const status=document.getElementById('im-status').value;
-  const prev=key?allIm.find(x=>x.key===key):null;
-  // 입고완료로 바뀌는 순간 입고일 자동 기록, 그 외 상태면 입고일 제거
-  let doneDate='';
-  if(status==='입고완료') doneDate=(prev&&prev.status==='입고완료'&&prev.doneDate)?prev.doneDate:todayStr;
+  const doneDate=document.getElementById('im-done-date').value||'';
   const data={vendor:document.getElementById('im-vendor').value.trim(),item:document.getElementById('im-item').value.trim(),orderDate:document.getElementById('im-order-date').value,expectDate:document.getElementById('im-expect-date').value,status:status,doneDate:doneDate,remit:document.getElementById('im-remit').value,note:document.getElementById('im-note').value.trim(),ts:Date.now()};
   if(!data.vendor||!data.item){ showToast('업체명과 품명은 필수입니다'); return; }
   if(key) await fbSet(`imports/${key}`,data);
