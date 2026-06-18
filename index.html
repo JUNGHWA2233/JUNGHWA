@@ -878,7 +878,7 @@ window.moveBuyer=async function(bKey,dir){
 window.deleteBuyer=async function(bKey){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
 
-  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('이 바이어를 삭제할까요?')) return;
+  if(!confirm('삭제하시겠습니까?')) return;
   await remove(ref(db,`buyers/${bKey}`));
 };
 
@@ -1055,7 +1055,7 @@ window.saveSh=async function(){
 window.deleteSh=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
 
-  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('삭제할까요?')) return;
+  if(!confirm('삭제하시겠습니까?')) return;
   await fbDelete(`shipments/${key}`);
   showToast('삭제됐습니다');
   await loadShipments();
@@ -1118,7 +1118,7 @@ window.moveIssue=async function(key,dir){
 window.deleteIssue=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
 
-  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('삭제할까요?')) return;
+  if(!confirm('삭제하시겠습니까?')) return;
   await remove(ref(db,'issues/'+key));
   await loadIssues();
 };
@@ -1263,17 +1263,31 @@ window.renderImports=function(){
   const kw=(document.getElementById('im-search')?.value||'').toLowerCase().trim();
   const STATUS_STYLE={'발주':'background:#eef4ff;color:#1a3a7a;border:1px solid #b8cef5;','선적':'background:#fff3e0;color:#e65100;border:1px solid #ffcc80;','입고완료':'background:#e4f2e8;color:#165c2a;border:1px solid #a8d9b5;'};
   const container=document.getElementById('im-list');
-  const displayIm=kw?allIm.filter(i=>(i.vendor||'').toLowerCase().includes(kw)||(i.item||'').toLowerCase().includes(kw)):allIm;
+  let displayIm=kw?allIm.filter(i=>(i.vendor||'').toLowerCase().includes(kw)||(i.item||'').toLowerCase().includes(kw)):allIm.slice();
+  // 정렬: 미완료(출고예정일 임박순) 먼저, 입고완료는 맨 아래로
+  displayIm=displayIm.slice().sort((a,b)=>{
+    const aDone=a.status==='입고완료', bDone=b.status==='입고완료';
+    if(aDone!==bDone) return aDone?1:-1; // 완료된건 아래로
+    if(!aDone){
+      // 미완료: 출항예정일 빠른 순(임박한 순)
+      const aDate=a.expectDate||'9999-99-99';
+      const bDate=b.expectDate||'9999-99-99';
+      return aDate<bDate?-1:aDate>bDate?1:0;
+    }
+    // 완료된 것들끼리는 기존 순서 유지
+    return 0;
+  });
   if(!displayIm.length){ container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text3);">'+(kw?'검색 결과가 없습니다':'등록된 수입 건이 없습니다')+'</div>'; return; }
   container.innerHTML=displayIm.map((imp,impIdx)=>{
-    const isToday=imp.expectDate===todayStr&&imp.status!=='입고완료';
-    const isOver=imp.expectDate&&imp.expectDate<todayStr&&imp.status!=='입고완료';
-    const isSoon=imp.expectDate&&imp.expectDate>todayStr&&Math.floor((new Date(imp.expectDate)-new Date(todayStr))/864e5)<=7&&imp.status!=='입고완료';
+    const isDone=imp.status==='입고완료';
+    const isToday=imp.expectDate===todayStr&&!isDone;
+    const isOver=imp.expectDate&&imp.expectDate<todayStr&&!isDone;
+    const isSoon=imp.expectDate&&imp.expectDate>todayStr&&Math.floor((new Date(imp.expectDate)-new Date(todayStr))/864e5)<=7&&!isDone;
     const remitIcon=imp.remit==='o'?'<span style="font-size:12px;color:#165c2a;font-weight:600;">완료</span>':imp.remit==='x'?'<span style="font-size:12px;color:#c0392b;font-weight:600;">미완료</span>':'<span style="font-size:12px;color:var(--text3);">-</span>';
-    return `<div style="background:var(--surface);border:1px solid ${isToday?'#c0392b':isOver?'#f5b8b0':isSoon?'#f5cc80':'var(--border)'};border-radius:10px;padding:1rem;">
+    return `<div style="background:${isDone?'#f5f5f3':'var(--surface)'};border:1px solid ${isDone?'var(--border)':isToday?'#c0392b':isOver?'#f5b8b0':isSoon?'#f5cc80':'var(--border)'};border-radius:10px;padding:1rem;${isDone?'opacity:.65;':''}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.5rem;gap:8px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-          <span style="font-size:14px;font-weight:700;">${esc(imp.vendor||'')}</span>
+          <span style="font-size:14px;font-weight:700;${isDone?'color:var(--text3);':''}">${esc(imp.vendor||'')}</span>
           <span style="font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;${STATUS_STYLE[imp.status]||''}">${esc(imp.status)}</span>
           ${isToday?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#fff0ee;color:#c0392b;font-weight:600;">🔴 출항예정일 당일</span>':''}
           ${isOver?'<span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#fff0ee;color:#c0392b;font-weight:600;">출항예정일 초과</span>':''}
@@ -1286,7 +1300,7 @@ window.renderImports=function(){
           <button onclick="deleteIm('${imp.key}')" style="font-size:12px;padding:3px 8px;background:none;border:none;cursor:pointer;color:var(--text3);font-family:var(--sans);">삭제</button>
         </div>
       </div>
-      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:.6rem;">${esc(imp.item||'')}</div>
+      <div style="font-size:15px;font-weight:600;color:${isDone?'var(--text3)':'var(--text)'};margin-bottom:.6rem;${isDone?'text-decoration:line-through;':''}">${esc(imp.item||'')}</div>
       <div style="display:flex;gap:16px;font-size:12px;flex-wrap:wrap;">
         <div><span style="color:var(--text3);">발주일 </span><span style="font-weight:500;">${esc(imp.orderDate||'-')}</span></div>
         <div><span style="color:var(--text3);">출항예정일 </span><span style="font-weight:500;${isToday||isOver?'color:#c0392b;':isSoon?'color:#e65100;':''}">${esc(imp.expectDate||'-')}</span></div>
@@ -1330,8 +1344,7 @@ window.moveIm=async function(key,dir){
 
 window.deleteIm=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
-
-  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('삭제할까요?')) return;
+  if(!confirm('삭제하시겠습니까?')) return;
   await fbDelete(`imports/${key}`); showToast('삭제됐습니다');
   await loadImports();
 };
@@ -1515,9 +1528,8 @@ window.saveClProduct=async function(){
 
 window.deleteClProduct=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
-
-  if(!confirm('삭제하시겠습니까?')) return;  const items=allCl.filter(c=>c.productKey===key);
-  const msg=items.length?`이 제품과 연결된 바이어 체크리스트 ${items.length}건도 함께 삭제됩니다. 삭제할까요?`:'삭제할까요?';
+  const items=allCl.filter(c=>c.productKey===key);
+  const msg=items.length?`이 제품과 연결된 바이어 체크리스트 ${items.length}건도 함께 삭제됩니다. 삭제하시겠습니까?`:'삭제하시겠습니까?';
   if(!confirm(msg)) return;
   await fbDelete(`checklist_products/${key}`);
   for(const c of items) await fbDelete(`checklist/${c.key}`);
@@ -1584,7 +1596,7 @@ window.saveCl=async function(){
 window.deleteCl=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
 
-  if(!confirm('삭제하시겠습니까?')) return;  if(!confirm('삭제할까요?')) return;
+  if(!confirm('삭제하시겠습니까?')) return;
   await fbDelete(`checklist/${key}`); showToast('삭제됐습니다');
   await loadChecklist();
 };
