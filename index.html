@@ -287,6 +287,7 @@ body.readonly .readonly-banner{display:block;}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
     <div style="font-size:15px;font-weight:500;">저장된 일지 히스토리</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <input type="text" id="hist-search" placeholder="🔍 내용 검색..." oninput="renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);width:140px;"/>
       <select id="hist-buyer-filter" onchange="window._histViewAll=false;renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);"><option value="">전체 바이어</option></select>
       <input type="date" id="hist-date-filter" onchange="window._histViewAll=false;renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);" title="시작일 (종료일과 함께 선택 시 기간 검색)"/>
       <span style="font-size:12px;color:var(--text3);">~</span>
@@ -1677,6 +1678,7 @@ window.renderHistory=function(){
   const bf=document.getElementById('hist-buyer-filter').value;
   const df=document.getElementById('hist-date-filter').value;
   const dfEnd=document.getElementById('hist-date-filter-end').value;
+  const kw=(document.getElementById('hist-search')?.value||'').toLowerCase().trim();
   const sel=document.getElementById('hist-buyer-filter');
   const prev=sel.value;
   const names=[...new Set(logs.flatMap(l=>(l.buyers||[]).map(b=>b.name)))];
@@ -1684,7 +1686,11 @@ window.renderHistory=function(){
   sel.value=prev;
   let filtered;
   let subLabel;
-  if(df&&dfEnd){
+  if(kw){
+    // 검색어가 있으면 날짜 제한 없이 전체에서 검색
+    filtered=logs;
+    subLabel=`"${kw}" 검색 결과 · 총 ${filtered.length}건 중 일치 항목`;
+  } else if(df&&dfEnd){
     // 기간 검색 (시작일~종료일)
     const start=df<dfEnd?df:dfEnd, end=df<dfEnd?dfEnd:df;
     filtered=logs.filter(l=>l.date>=start&&l.date<=end);
@@ -1699,14 +1705,17 @@ window.renderHistory=function(){
   document.getElementById('hist-sub').textContent=subLabel;
   const container=document.getElementById('hist-list');
   if(!filtered.length){ container.innerHTML='<div class="empty">저장된 기록이 없습니다</div>'; return; }
+  let matchCount=0;
   container.innerHTML=filtered.map(log=>{
     let bs=log.buyers||[];
     if(bf) bs=bs.filter(b=>b.name===bf);
+    if(kw) bs=bs.filter(b=>b.name.toLowerCase().includes(kw)||(b.tasks||[]).some(t=>(t.text||'').toLowerCase().includes(kw)));
     if(!bs.length) return '';
     const allT=bs.flatMap(b=>b.tasks||[]);
     const pCnt=allT.filter(t=>!t.done).length, dCnt=allT.filter(t=>t.done).length;
     const bHtml=bs.map(b=>{
-      const tasks=(b.tasks||[]).filter(t=>t.text);
+      let tasks=(b.tasks||[]).filter(t=>t.text);
+      if(kw&&!b.name.toLowerCase().includes(kw)) tasks=tasks.filter(t=>(t.text||'').toLowerCase().includes(kw));
       if(!tasks.length) return '';
       return `<div><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px;">${esc(b.name)}</div>
         ${tasks.map(t=>`<div style="display:flex;align-items:flex-start;gap:6px;font-size:12px;padding:2px 0;">
@@ -1716,6 +1725,7 @@ window.renderHistory=function(){
       </div>`;
     }).filter(Boolean).join('');
     if(!bHtml) return '';
+    matchCount++;
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'flex':'none'">
         <div style="display:flex;align-items:center;gap:10px;">
@@ -1727,33 +1737,41 @@ window.renderHistory=function(){
       <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;">${bHtml}</div>
     </div>`;
   }).filter(Boolean).join('');
+  if(kw){
+    if(!matchCount) container.innerHTML='<div class="empty">검색 결과가 없습니다</div>';
+    document.getElementById('hist-sub').textContent=`"${kw}" 검색 결과 · ${matchCount}건의 일지에서 발견`;
+  }
 };
 window.deleteLog=async function(key){
   if(!confirm('이 히스토리를 삭제할까요?')) return;
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   await remove(ref(db,'worklogs2/'+key)); showToast('히스토리 삭제됨');
 };
-window.clearHistFilter=function(){ window._histViewAll=false; document.getElementById('hist-buyer-filter').value=''; document.getElementById('hist-date-filter').value=''; document.getElementById('hist-date-filter-end').value=''; renderHistory(); };
+window.clearHistFilter=function(){ window._histViewAll=false; document.getElementById('hist-buyer-filter').value=''; document.getElementById('hist-date-filter').value=''; document.getElementById('hist-date-filter-end').value=''; document.getElementById('hist-search').value=''; renderHistory(); };
 window.showAllHistory=function(){ window._histViewAll=true; document.getElementById('hist-date-filter').value=''; document.getElementById('hist-date-filter-end').value=''; renderHistoryAll(); };
 window.renderHistoryAll=function(){
   const bf=document.getElementById('hist-buyer-filter').value;
+  const kw=(document.getElementById('hist-search')?.value||'').toLowerCase().trim();
   const sel=document.getElementById('hist-buyer-filter');
   const prev=sel.value;
   const names=[...new Set(logs.flatMap(l=>(l.buyers||[]).map(b=>b.name)))];
   sel.innerHTML='<option value="">전체 바이어</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
   sel.value=prev;
   let filtered=logs;
-  document.getElementById('hist-sub').textContent=`전체 ${filtered.length}건 (날짜별)`;
+  document.getElementById('hist-sub').textContent=kw?`"${kw}" 검색 결과`:`전체 ${filtered.length}건 (날짜별)`;
   const container=document.getElementById('hist-list');
   if(!filtered.length){ container.innerHTML='<div class="empty">저장된 기록이 없습니다</div>'; return; }
+  let matchCount=0;
   container.innerHTML=filtered.map(log=>{
     let bs=log.buyers||[];
     if(bf) bs=bs.filter(b=>b.name===bf);
+    if(kw) bs=bs.filter(b=>b.name.toLowerCase().includes(kw)||(b.tasks||[]).some(t=>(t.text||'').toLowerCase().includes(kw)));
     if(!bs.length) return '';
     const allT=bs.flatMap(b=>b.tasks||[]);
     const pCnt=allT.filter(t=>!t.done).length, dCnt=allT.filter(t=>t.done).length;
     const bHtml=bs.map(b=>{
-      const tasks=(b.tasks||[]).filter(t=>t.text);
+      let tasks=(b.tasks||[]).filter(t=>t.text);
+      if(kw&&!b.name.toLowerCase().includes(kw)) tasks=tasks.filter(t=>(t.text||'').toLowerCase().includes(kw));
       if(!tasks.length) return '';
       return `<div><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px;">${esc(b.name)}</div>
         ${tasks.map(t=>`<div style="display:flex;align-items:flex-start;gap:6px;font-size:12px;padding:2px 0;">
@@ -1763,6 +1781,7 @@ window.renderHistoryAll=function(){
       </div>`;
     }).filter(Boolean).join('');
     if(!bHtml) return '';
+    matchCount++;
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'flex':'none'">
         <div style="display:flex;align-items:center;gap:10px;">
@@ -1774,6 +1793,10 @@ window.renderHistoryAll=function(){
       <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;">${bHtml}</div>
     </div>`;
   }).filter(Boolean).join('');
+  if(kw){
+    if(!matchCount) container.innerHTML='<div class="empty">검색 결과가 없습니다</div>';
+    document.getElementById('hist-sub').textContent=`"${kw}" 검색 결과 · ${matchCount}건의 일지에서 발견`;
+  }
 };
 
 // ── 일지 저장 ──
@@ -1844,8 +1867,11 @@ window.downloadHistoryDocx=function(){
   const bf=document.getElementById('hist-buyer-filter').value;
   const df=document.getElementById('hist-date-filter').value;
   const dfEnd=document.getElementById('hist-date-filter-end').value;
+  const kw=(document.getElementById('hist-search')?.value||'').toLowerCase().trim();
   let filtered, titleSuffix;
-  if(window._histViewAll){
+  if(kw){
+    filtered=logs; titleSuffix=`검색_${kw}`;
+  } else if(window._histViewAll){
     filtered=logs; titleSuffix='전체';
   } else if(df&&dfEnd){
     const start=df<dfEnd?df:dfEnd, end=df<dfEnd?dfEnd:df;
@@ -1860,11 +1886,13 @@ window.downloadHistoryDocx=function(){
   filtered.forEach(log=>{
     let bs=log.buyers||[];
     if(bf) bs=bs.filter(b=>b.name===bf);
+    if(kw) bs=bs.filter(b=>b.name.toLowerCase().includes(kw)||(b.tasks||[]).some(t=>(t.text||'').toLowerCase().includes(kw)));
     bs=bs.filter(b=>(b.tasks||[]).some(t=>t.text));
     if(!bs.length) return;
-    paras.push(`<w:p><w:pPr><w:spacing w:before="240" w:after="80"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>${xmlEsc(log.date)} (${xmlEsc(log.author||'')})</w:t></w:r></w:p>`);
+    paras.push(`<w:p><w:pPr><w:spacing w:before="240" w:after="80"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>${xmlEsc(log.date)}</w:t></w:r></w:p>`);
     bs.forEach(b=>{
-      const tasks=(b.tasks||[]).filter(t=>t.text);
+      let tasks=(b.tasks||[]).filter(t=>t.text);
+      if(kw&&!b.name.toLowerCase().includes(kw)) tasks=tasks.filter(t=>(t.text||'').toLowerCase().includes(kw));
       if(!tasks.length) return;
       paras.push(`<w:p><w:pPr><w:spacing w:before="120" w:after="40"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="22"/></w:rPr><w:t>${xmlEsc(b.name)}</w:t></w:r></w:p>`);
       tasks.forEach(t=>{ paras.push(`<w:p><w:pPr><w:spacing w:after="20"/><w:ind w:left="200"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/>${t.done?'<w:strike/>':''}</w:rPr><w:t xml:space="preserve">${t.done?'☑':'☐'} ${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p>`); });
