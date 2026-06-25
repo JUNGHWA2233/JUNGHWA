@@ -1778,21 +1778,39 @@ window.saveSnapshot=async function(){
 };
 
 // ── Word 다운로드 ──
-window.downloadDocx=function(){
+window.downloadDocx=async function(){
   const entries=Object.entries(buyers);
-  if(!entries.length){ showToast('데이터가 없습니다'); return; }
+  // 오늘 출고/수입 알람 수집 (오늘 할 일 상단 알람과 동일 로직)
+  const alertRows=[];
+  try{
+    const shData=await fbGet('shipments');
+    if(shData) Object.values(shData).forEach(s=>{
+      if(s.shipDate===todayStr&&s.shipout!=='o')
+        alertRows.push(`출고일정 — ${s.buyer||''} / ${s.po||''}${s.size?' ('+s.size+')':''} 출고 당일`);
+    });
+    const imData=await fbGet('imports');
+    if(imData) Object.values(imData).forEach(imp=>{
+      if(imp.expectDate===todayStr&&imp.status!=='입고완료')
+        alertRows.push(`수입 건 — ${imp.vendor||''} / ${imp.item||''} 출고예정일 당일`);
+      if(imp.status==='입고완료'&&imp.doneDate&&imp.remit!=='o'){
+        const [dy,dm,dd]=imp.doneDate.split('-').map(Number);
+        const [ty,tm,td]=todayStr.split('-').map(Number);
+        const diffDays=Math.round((new Date(ty,tm-1,td)-new Date(dy,dm-1,dd))/864e5);
+        if(diffDays>=14) alertRows.push(`송금 필요 — ${imp.vendor||''} / ${imp.item||''} (입고일 ${imp.doneDate}, ${diffDays}일 경과) 송금 미완료`);
+      }
+    });
+  }catch(e){}
+  if(!entries.length&&!alertRows.length){ showToast('데이터가 없습니다'); return; }
   const rows=[];
+  if(alertRows.length){
+    rows.push(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/><w:shd w:val="clear" w:color="auto" w:fill="c0392b"/></w:tcPr><w:p><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="24"/></w:rPr><w:t>오늘 수출/수입 알림</w:t></w:r></w:p></w:tc></w:tr>`);
+    alertRows.forEach(txt=>{ rows.push(`<w:tr><w:tc><w:tcPr><w:tcW w:w="400" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>🔔</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="8960" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEsc(txt)}</w:t></w:r></w:p></w:tc></w:tr>`); });
+  }
   entries.forEach(([,b])=>{
-    const tasks=Object.values(b.tasks||{}).filter(t=>!t.done);
+    const tasks=Object.values(b.tasks||{}).filter(t=>!t.done&&t.type==='reply-out');
     if(!tasks.length) return;
     rows.push(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/><w:shd w:val="clear" w:color="auto" w:fill="2a2520"/></w:tcPr><w:p><w:r><w:rPr><w:b/><w:color w:val="F5F4F0"/><w:sz w:val="24"/></w:rPr><w:t>${xmlEsc(b.name)}</w:t></w:r></w:p></w:tc></w:tr>`);
-    ['reply-out','memo'].forEach(type=>{
-      const items=tasks.filter(t=>t.type===type);
-      if(!items.length) return;
-      const typeLabel={'reply-out':'회신 필요','memo':'메모'};
-      rows.push(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr><w:p><w:r><w:rPr><w:b/><w:sz w:val="18"/></w:rPr><w:t>${xmlEsc(typeLabel[type]||type)}</w:t></w:r></w:p></w:tc></w:tr>`);
-      items.forEach(t=>{ rows.push(`<w:tr><w:tc><w:tcPr><w:tcW w:w="400" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>☐</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="8960" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p></w:tc></w:tr>`); });
-    });
+    tasks.forEach(t=>{ rows.push(`<w:tr><w:tc><w:tcPr><w:tcW w:w="400" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>☐</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="8960" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p></w:tc></w:tr>`); });
   });
   const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>해외영업부 업무 일지 - ${todayStr}</w:t></w:r></w:p><w:p/><w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:left w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:right w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="400"/><w:gridCol w:w="8960"/></w:tblGrid>${rows.join('')}</w:tbl><w:sectPr><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:body></w:document>`;
   const script=document.createElement('script');
