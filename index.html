@@ -1856,22 +1856,22 @@ window.downloadHistoryDocx=function(){
     filtered=logs.filter(l=>l.date===todayStr); titleSuffix=todayStr;
   }
   if(!filtered.length){ showToast('다운로드할 히스토리가 없습니다'); return; }
-  const rows=[];
+  const paras=[];
   filtered.forEach(log=>{
     let bs=log.buyers||[];
     if(bf) bs=bs.filter(b=>b.name===bf);
     bs=bs.filter(b=>(b.tasks||[]).some(t=>t.text));
     if(!bs.length) return;
-    rows.push(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/><w:shd w:val="clear" w:color="auto" w:fill="c0392b"/></w:tcPr><w:p><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="26"/></w:rPr><w:t>${xmlEsc(log.date)} (${xmlEsc(log.author||'')})</w:t></w:r></w:p></w:tc></w:tr>`);
+    paras.push(`<w:p><w:pPr><w:spacing w:before="240" w:after="80"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>${xmlEsc(log.date)} (${xmlEsc(log.author||'')})</w:t></w:r></w:p>`);
     bs.forEach(b=>{
       const tasks=(b.tasks||[]).filter(t=>t.text);
       if(!tasks.length) return;
-      rows.push(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/><w:shd w:val="clear" w:color="auto" w:fill="2a2520"/></w:tcPr><w:p><w:r><w:rPr><w:b/><w:color w:val="F5F4F0"/><w:sz w:val="22"/></w:rPr><w:t>${xmlEsc(b.name)}</w:t></w:r></w:p></w:tc></w:tr>`);
-      tasks.forEach(t=>{ rows.push(`<w:tr><w:tc><w:tcPr><w:tcW w:w="400" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>${t.done?'☑':'☐'}</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="8960" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/>${t.done?'<w:strike/>':''}</w:rPr><w:t xml:space="preserve">${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p></w:tc></w:tr>`); });
+      paras.push(`<w:p><w:pPr><w:spacing w:before="120" w:after="40"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="22"/></w:rPr><w:t>${xmlEsc(b.name)}</w:t></w:r></w:p>`);
+      tasks.forEach(t=>{ paras.push(`<w:p><w:pPr><w:spacing w:after="20"/><w:ind w:left="200"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/>${t.done?'<w:strike/>':''}</w:rPr><w:t xml:space="preserve">${t.done?'☑':'☐'} ${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p>`); });
     });
   });
-  if(!rows.length){ showToast('다운로드할 히스토리가 없습니다'); return; }
-  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>해외영업부 업무 히스토리 - ${xmlEsc(titleSuffix)}</w:t></w:r></w:p><w:p/><w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:left w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:right w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="400"/><w:gridCol w:w="8960"/></w:tblGrid>${rows.join('')}</w:tbl><w:sectPr><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:body></w:document>`;
+  if(!paras.length){ showToast('다운로드할 히스토리가 없습니다'); return; }
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>해외영업부 업무 히스토리 - ${xmlEsc(titleSuffix)}</w:t></w:r></w:p><w:p/>${paras.join('')}<w:sectPr><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:body></w:document>`;
   const script=document.createElement('script');
   script.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
   script.onload=function(){
