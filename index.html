@@ -287,10 +287,13 @@ body.readonly .readonly-banner{display:block;}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
     <div style="font-size:15px;font-weight:500;">저장된 일지 히스토리</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-      <select id="hist-buyer-filter" onchange="renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);"><option value="">전체 바이어</option></select>
-      <input type="date" id="hist-date-filter" onchange="renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);" title="날짜 선택 시 해당 날짜 일지 표시"/>
+      <select id="hist-buyer-filter" onchange="window._histViewAll=false;renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);"><option value="">전체 바이어</option></select>
+      <input type="date" id="hist-date-filter" onchange="window._histViewAll=false;renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);" title="시작일 (종료일과 함께 선택 시 기간 검색)"/>
+      <span style="font-size:12px;color:var(--text3);">~</span>
+      <input type="date" id="hist-date-filter-end" onchange="window._histViewAll=false;renderHistory()" style="font-size:12px;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:var(--surface2);" title="종료일 (시작일과 함께 선택 시 기간 검색)"/>
       <button class="btn-dark btn-light" style="font-size:12px;padding:5px 8px;" onclick="clearHistFilter()">초기화</button>
       <button class="btn-dark btn-light" style="font-size:12px;padding:5px 8px;" onclick="showAllHistory()">전체 보기</button>
+      <button class="btn-dark btn-light" style="font-size:12px;padding:5px 8px;" onclick="downloadHistoryDocx()">📄 Word</button>
     </div>
   </div>
   <div id="hist-sub" style="font-size:12px;color:var(--text3);margin-bottom:.75rem;"></div>
@@ -534,7 +537,7 @@ function startApp(){
   });
 
   onValue(buyersRef,snap=>{ buyers=snap.val()||{}; renderAll(); });
-  onValue(query(logsRef,orderByChild('ts')),snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.reverse(); if(curPage==='history') renderHistory(); });
+  onValue(query(logsRef,orderByChild('ts')),snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.reverse(); if(curPage==='history'){ if(window._histViewAll) renderHistoryAll(); else renderHistory(); } });
   // issues는 REST API로 처리
   switchPage('today');
 }
@@ -1673,14 +1676,27 @@ window.downloadClDocx=function(){
 window.renderHistory=function(){
   const bf=document.getElementById('hist-buyer-filter').value;
   const df=document.getElementById('hist-date-filter').value;
+  const dfEnd=document.getElementById('hist-date-filter-end').value;
   const sel=document.getElementById('hist-buyer-filter');
   const prev=sel.value;
   const names=[...new Set(logs.flatMap(l=>(l.buyers||[]).map(b=>b.name)))];
   sel.innerHTML='<option value="">전체 바이어</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
   sel.value=prev;
-  let filtered=logs.filter(l=>l.date===todayStr);
-  if(df) filtered=filtered.filter(l=>l.date===df);
-  document.getElementById('hist-sub').textContent=`총 ${filtered.length}건`;
+  let filtered;
+  let subLabel;
+  if(df&&dfEnd){
+    // 기간 검색 (시작일~종료일)
+    const start=df<dfEnd?df:dfEnd, end=df<dfEnd?dfEnd:df;
+    filtered=logs.filter(l=>l.date>=start&&l.date<=end);
+    subLabel=`${start} ~ ${end} 기간 · 총 ${filtered.length}건`;
+  } else if(df){
+    filtered=logs.filter(l=>l.date===df);
+    subLabel=`총 ${filtered.length}건`;
+  } else {
+    filtered=logs.filter(l=>l.date===todayStr);
+    subLabel=`총 ${filtered.length}건`;
+  }
+  document.getElementById('hist-sub').textContent=subLabel;
   const container=document.getElementById('hist-list');
   if(!filtered.length){ container.innerHTML='<div class="empty">저장된 기록이 없습니다</div>'; return; }
   container.innerHTML=filtered.map(log=>{
@@ -1694,7 +1710,6 @@ window.renderHistory=function(){
       if(!tasks.length) return '';
       return `<div><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px;">${esc(b.name)}</div>
         ${tasks.map(t=>`<div style="display:flex;align-items:flex-start;gap:6px;font-size:12px;padding:2px 0;">
-          <span style="font-size:10px;padding:1px 6px;border-radius:3px;font-weight:600;white-space:nowrap;flex-shrink:0;margin-top:1px;${TYPE_CSS[t.type]||''}">${TYPE_SHORT[t.type]||t.type}</span>
           <span style="flex:1;line-height:1.5;${t.done?'text-decoration:line-through;opacity:.4;':''}">${esc(t.text)}</span>
           ${t.dueDate?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;">${t.dueDate}</span>`:''}
         </div>`).join('')}
@@ -1718,8 +1733,8 @@ window.deleteLog=async function(key){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   await remove(ref(db,'worklogs2/'+key)); showToast('히스토리 삭제됨');
 };
-window.clearHistFilter=function(){ document.getElementById('hist-buyer-filter').value=''; document.getElementById('hist-date-filter').value=''; renderHistory(); };
-window.showAllHistory=function(){ document.getElementById('hist-date-filter').value=''; renderHistoryAll(); };
+window.clearHistFilter=function(){ window._histViewAll=false; document.getElementById('hist-buyer-filter').value=''; document.getElementById('hist-date-filter').value=''; document.getElementById('hist-date-filter-end').value=''; renderHistory(); };
+window.showAllHistory=function(){ window._histViewAll=true; document.getElementById('hist-date-filter').value=''; document.getElementById('hist-date-filter-end').value=''; renderHistoryAll(); };
 window.renderHistoryAll=function(){
   const bf=document.getElementById('hist-buyer-filter').value;
   const sel=document.getElementById('hist-buyer-filter');
@@ -1742,7 +1757,6 @@ window.renderHistoryAll=function(){
       if(!tasks.length) return '';
       return `<div><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px;">${esc(b.name)}</div>
         ${tasks.map(t=>`<div style="display:flex;align-items:flex-start;gap:6px;font-size:12px;padding:2px 0;">
-          <span style="font-size:10px;padding:1px 6px;border-radius:3px;font-weight:600;white-space:nowrap;flex-shrink:0;margin-top:1px;${TYPE_CSS[t.type]||''}">${TYPE_SHORT[t.type]||t.type}</span>
           <span style="flex:1;line-height:1.5;${t.done?'text-decoration:line-through;opacity:.4;':''}">${esc(t.text)}</span>
           ${t.dueDate?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;">${t.dueDate}</span>`:''}
         </div>`).join('')}
@@ -1807,10 +1821,10 @@ window.downloadDocx=async function(){
     alertRows.forEach(txt=>{ rows.push(`<w:tr><w:tc><w:tcPr><w:tcW w:w="400" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>🔔</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="8960" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEsc(txt)}</w:t></w:r></w:p></w:tc></w:tr>`); });
   }
   entries.forEach(([,b])=>{
-    const tasks=Object.values(b.tasks||{}).filter(t=>!t.done&&t.type==='reply-out');
+    const tasks=Object.values(b.tasks||{}).filter(t=>!t.done&&(t.type==='reply-out'||(t.type==='memo'&&t.dueDate===todayStr)));
     if(!tasks.length) return;
     rows.push(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/><w:shd w:val="clear" w:color="auto" w:fill="2a2520"/></w:tcPr><w:p><w:r><w:rPr><w:b/><w:color w:val="F5F4F0"/><w:sz w:val="24"/></w:rPr><w:t>${xmlEsc(b.name)}</w:t></w:r></w:p></w:tc></w:tr>`);
-    tasks.forEach(t=>{ rows.push(`<w:tr><w:tc><w:tcPr><w:tcW w:w="400" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>☐</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="8960" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p></w:tc></w:tr>`); });
+    tasks.forEach(t=>{ const tag=t.type==='memo'?'[오늘마감] ':''; rows.push(`<w:tr><w:tc><w:tcPr><w:tcW w:w="400" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>☐</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="8960" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEsc(tag+t.text)}${t.dueDate&&t.type==='reply-out'?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p></w:tc></w:tr>`); });
   });
   const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>해외영업부 업무 일지 - ${todayStr}</w:t></w:r></w:p><w:p/><w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:left w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:right w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="400"/><w:gridCol w:w="8960"/></w:tblGrid>${rows.join('')}</w:tbl><w:sectPr><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:body></w:document>`;
   const script=document.createElement('script');
@@ -1821,6 +1835,51 @@ window.downloadDocx=async function(){
     zip.file('_rels/.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
     zip.file('word/document.xml',docXml);
     zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}).then(blob=>{ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`업무일지_${todayStr}.docx`; a.click(); URL.revokeObjectURL(url); showToast('Word 다운로드 완료'); });
+  };
+  document.head.appendChild(script);
+};
+
+// ── 히스토리 Word 다운로드 (현재 필터 적용된 목록 기준) ──
+window.downloadHistoryDocx=function(){
+  const bf=document.getElementById('hist-buyer-filter').value;
+  const df=document.getElementById('hist-date-filter').value;
+  const dfEnd=document.getElementById('hist-date-filter-end').value;
+  let filtered, titleSuffix;
+  if(window._histViewAll){
+    filtered=logs; titleSuffix='전체';
+  } else if(df&&dfEnd){
+    const start=df<dfEnd?df:dfEnd, end=df<dfEnd?dfEnd:df;
+    filtered=logs.filter(l=>l.date>=start&&l.date<=end); titleSuffix=`${start}~${end}`;
+  } else if(df){
+    filtered=logs.filter(l=>l.date===df); titleSuffix=df;
+  } else {
+    filtered=logs.filter(l=>l.date===todayStr); titleSuffix=todayStr;
+  }
+  if(!filtered.length){ showToast('다운로드할 히스토리가 없습니다'); return; }
+  const rows=[];
+  filtered.forEach(log=>{
+    let bs=log.buyers||[];
+    if(bf) bs=bs.filter(b=>b.name===bf);
+    bs=bs.filter(b=>(b.tasks||[]).some(t=>t.text));
+    if(!bs.length) return;
+    rows.push(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/><w:shd w:val="clear" w:color="auto" w:fill="c0392b"/></w:tcPr><w:p><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="26"/></w:rPr><w:t>${xmlEsc(log.date)} (${xmlEsc(log.author||'')})</w:t></w:r></w:p></w:tc></w:tr>`);
+    bs.forEach(b=>{
+      const tasks=(b.tasks||[]).filter(t=>t.text);
+      if(!tasks.length) return;
+      rows.push(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/><w:shd w:val="clear" w:color="auto" w:fill="2a2520"/></w:tcPr><w:p><w:r><w:rPr><w:b/><w:color w:val="F5F4F0"/><w:sz w:val="22"/></w:rPr><w:t>${xmlEsc(b.name)}</w:t></w:r></w:p></w:tc></w:tr>`);
+      tasks.forEach(t=>{ rows.push(`<w:tr><w:tc><w:tcPr><w:tcW w:w="400" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>${t.done?'☑':'☐'}</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="8960" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/>${t.done?'<w:strike/>':''}</w:rPr><w:t xml:space="preserve">${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p></w:tc></w:tr>`); });
+    });
+  });
+  if(!rows.length){ showToast('다운로드할 히스토리가 없습니다'); return; }
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>해외영업부 업무 히스토리 - ${xmlEsc(titleSuffix)}</w:t></w:r></w:p><w:p/><w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:left w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:right w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="E0DED7"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="400"/><w:gridCol w:w="8960"/></w:tblGrid>${rows.join('')}</w:tbl><w:sectPr><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:body></w:document>`;
+  const script=document.createElement('script');
+  script.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+  script.onload=function(){
+    const zip=new JSZip();
+    zip.file('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+    zip.file('_rels/.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+    zip.file('word/document.xml',docXml);
+    zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}).then(blob=>{ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`업무히스토리_${titleSuffix}.docx`; a.click(); URL.revokeObjectURL(url); showToast('Word 다운로드 완료'); });
   };
   document.head.appendChild(script);
 };
