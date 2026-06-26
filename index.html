@@ -538,7 +538,7 @@ function startApp(){
   });
 
   onValue(buyersRef,snap=>{ buyers=snap.val()||{}; renderAll(); });
-  onValue(logsRef,snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.sort((a,b)=>(b.ts||0)-(a.ts||0)); console.log('[DEBUG] logs updated, count=',logs.length,'dates=',logs.map(l=>l.date)); if(curPage==='history'){ if(window._histViewAll) renderHistoryAll(); else renderHistory(); } });
+  loadLogs(); // 초기 1회 로드 (실시간 리스너 대신 get()으로 명시적 로드)
   // issues는 REST API로 처리
   switchPage('today');
 }
@@ -557,7 +557,7 @@ window.switchPage=function(p){
   });
   if(p==='shipments') loadShipments();
   if(p==='imports') loadImports();
-  if(p==='history'){ if(window._histViewAll) renderHistoryAll(); else renderHistory(); }
+  if(p==='history'){ loadLogs().then(()=>{ if(window._histViewAll) renderHistoryAll(); else renderHistory(); }); }
   if(p==='issues') loadIssues();
   if(p==='buyers') renderBuyers();
   if(p==='checklist') loadChecklist();
@@ -1747,9 +1747,11 @@ window.deleteLog=async function(key){
   if(!confirm('이 히스토리를 삭제할까요?')) return;
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
   await remove(ref(db,'worklogs2/'+key)); showToast('히스토리 삭제됨');
+  await loadLogs();
+  if(window._histViewAll) renderHistoryAll(); else renderHistory();
 };
-window.clearHistFilter=function(){ window._histViewAll=false; document.getElementById('hist-buyer-filter').value=''; document.getElementById('hist-date-filter').value=''; document.getElementById('hist-date-filter-end').value=''; document.getElementById('hist-search').value=''; renderHistory(); };
-window.showAllHistory=function(){ window._histViewAll=true; document.getElementById('hist-date-filter').value=''; document.getElementById('hist-date-filter-end').value=''; renderHistoryAll(); };
+window.clearHistFilter=async function(){ window._histViewAll=false; document.getElementById('hist-buyer-filter').value=''; document.getElementById('hist-date-filter').value=''; document.getElementById('hist-date-filter-end').value=''; document.getElementById('hist-search').value=''; await loadLogs(); renderHistory(); };
+window.showAllHistory=async function(){ window._histViewAll=true; document.getElementById('hist-date-filter').value=''; document.getElementById('hist-date-filter-end').value=''; await loadLogs(); renderHistoryAll(); };
 window.renderHistoryAll=function(){
   const bf=document.getElementById('hist-buyer-filter').value;
   const kw=(document.getElementById('hist-search')?.value||'').toLowerCase().trim();
@@ -1800,6 +1802,14 @@ window.renderHistoryAll=function(){
   }
 };
 
+// ── 일지 데이터 로드 (get 방식, onValue 실시간 리스너 미사용) ──
+window.loadLogs=async function(){
+  const data=await fbGet('worklogs2');
+  logs=[];
+  if(data) Object.entries(data).forEach(([key,val])=>logs.push({key,...val}));
+  logs.sort((a,b)=>(b.ts||0)-(a.ts||0));
+};
+
 // ── 일지 저장 ──
 window.saveSnapshot=async function(){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
@@ -1813,6 +1823,7 @@ window.saveSnapshot=async function(){
   })).filter(b=>b.tasks.length);
   if(!buyersToSave.length){ showToast('저장할 미완료 회신 건이 없습니다'); return; }
   await set(push(logsRef),{ts:Date.now(),date:todayStr,author:currentUser?.name||'미지정',buyers:buyersToSave});
+  await loadLogs(); // 저장 직후 즉시 재로드
   showToast(`${todayStr} 일지 저장됨`);
 };
 // ── Word 다운로드 ──
