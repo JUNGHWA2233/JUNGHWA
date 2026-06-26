@@ -546,6 +546,7 @@ function startApp(){
 // ── 페이지 전환 ──
 window.switchPage=function(p){
   curPage=p;
+  todayStr=new Date().toLocaleDateString('sv-SE'); // 탭 전환 시마다 날짜 갱신
   document.querySelectorAll('.page-tab').forEach((t,i)=>{
     const pages=['today','buyers','shipments','issues','checklist','imports','history'];
     t.classList.toggle('active',pages[i]===p);
@@ -1802,6 +1803,7 @@ window.renderHistoryAll=function(){
 // ── 일지 저장 ──
 window.saveSnapshot=async function(){
   if(isRO()){ showToast('읽기 전용 계정입니다'); return; }
+  todayStr=new Date().toLocaleDateString('sv-SE'); // 저장 시점 날짜 강제 갱신
   const entries=Object.entries(buyers);
   if(!entries.length){ showToast('저장할 데이터가 없습니다'); return; }
   // 오늘 할 일 시트 기준: reply-out 타입 중 완료 안 된 것만 저장
@@ -1811,7 +1813,7 @@ window.saveSnapshot=async function(){
   })).filter(b=>b.tasks.length);
   if(!buyersToSave.length){ showToast('저장할 미완료 회신 건이 없습니다'); return; }
   await set(push(logsRef),{ts:Date.now(),date:todayStr,author:currentUser?.name||'미지정',buyers:buyersToSave});
-  showToast('오늘 일지 저장됨');
+  showToast(`${todayStr} 일지 저장됨`);
 };
 
 // ── Word 다운로드 ──
