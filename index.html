@@ -538,7 +538,7 @@ function startApp(){
   });
 
   onValue(buyersRef,snap=>{ buyers=snap.val()||{}; renderAll(); });
-  onValue(query(logsRef,orderByChild('ts')),snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.reverse(); if(curPage==='history'){ if(window._histViewAll) renderHistoryAll(); else renderHistory(); } });
+  onValue(logsRef,snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.sort((a,b)=>(b.ts||0)-(a.ts||0)); if(curPage==='history'){ if(window._histViewAll) renderHistoryAll(); else renderHistory(); } });
   // issues는 REST API로 처리
   switchPage('today');
 }
@@ -557,7 +557,7 @@ window.switchPage=function(p){
   });
   if(p==='shipments') loadShipments();
   if(p==='imports') loadImports();
-  if(p==='history') renderHistory();
+  if(p==='history'){ if(window._histViewAll) renderHistoryAll(); else renderHistory(); }
   if(p==='issues') loadIssues();
   if(p==='buyers') renderBuyers();
   if(p==='checklist') loadChecklist();
@@ -1815,7 +1815,6 @@ window.saveSnapshot=async function(){
   await set(push(logsRef),{ts:Date.now(),date:todayStr,author:currentUser?.name||'미지정',buyers:buyersToSave});
   showToast(`${todayStr} 일지 저장됨`);
 };
-
 // ── Word 다운로드 ──
 window.downloadDocx=async function(){
   const entries=Object.entries(buyers);
