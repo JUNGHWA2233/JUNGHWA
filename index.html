@@ -538,7 +538,7 @@ function startApp(){
   });
 
   onValue(buyersRef,snap=>{ buyers=snap.val()||{}; renderAll(); });
-  onValue(logsRef,snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.sort((a,b)=>(b.ts||0)-(a.ts||0)); if(curPage==='history'){ if(window._histViewAll) renderHistoryAll(); else renderHistory(); } });
+  onValue(logsRef,snap=>{ logs=[]; snap.forEach(c=>logs.push({key:c.key,...c.val()})); logs.sort((a,b)=>(b.ts||0)-(a.ts||0)); console.log('[DEBUG] logs updated, count=',logs.length,'dates=',logs.map(l=>l.date)); if(curPage==='history'){ if(window._histViewAll) renderHistoryAll(); else renderHistory(); } });
   // issues는 REST API로 처리
   switchPage('today');
 }
