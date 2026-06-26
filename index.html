@@ -1720,7 +1720,7 @@ window.renderHistory=function(){
       if(!tasks.length) return '';
       return `<div><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px;">${esc(b.name)}</div>
         ${tasks.map(t=>`<div style="display:flex;align-items:flex-start;gap:6px;font-size:12px;padding:2px 0;">
-          <span style="flex:1;line-height:1.5;${t.done?'text-decoration:line-through;opacity:.4;':''}">${esc(t.text)}</span>
+          <span style="flex:1;line-height:1.5;">${esc(t.text)}</span>
           ${t.dueDate?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;">${t.dueDate}</span>`:''}
         </div>`).join('')}
       </div>`;
@@ -1778,7 +1778,7 @@ window.renderHistoryAll=function(){
       if(!tasks.length) return '';
       return `<div><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px;">${esc(b.name)}</div>
         ${tasks.map(t=>`<div style="display:flex;align-items:flex-start;gap:6px;font-size:12px;padding:2px 0;">
-          <span style="flex:1;line-height:1.5;${t.done?'text-decoration:line-through;opacity:.4;':''}">${esc(t.text)}</span>
+          <span style="flex:1;line-height:1.5;">${esc(t.text)}</span>
           ${t.dueDate?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;">${t.dueDate}</span>`:''}
         </div>`).join('')}
       </div>`;
@@ -1816,12 +1816,12 @@ window.saveSnapshot=async function(){
   todayStr=new Date().toLocaleDateString('sv-SE'); // 저장 시점 날짜 강제 갱신
   const entries=Object.entries(buyers);
   if(!entries.length){ showToast('저장할 데이터가 없습니다'); return; }
-  // 오늘 할 일 시트 기준: reply-out 타입 중 완료 안 된 것만 저장
+  // 오늘 할 일 시트 기준: reply-out 타입 전체 저장 (완료 여부 무관)
   const buyersToSave=entries.map(([,b])=>({
     name:b.name,
-    tasks:Object.values(b.tasks||{}).filter(t=>t.type==='reply-out'&&!t.done)
+    tasks:Object.values(b.tasks||{}).filter(t=>t.type==='reply-out')
   })).filter(b=>b.tasks.length);
-  if(!buyersToSave.length){ showToast('저장할 미완료 회신 건이 없습니다'); return; }
+  if(!buyersToSave.length){ showToast('저장할 회신 건이 없습니다'); return; }
   await set(push(logsRef),{ts:Date.now(),date:todayStr,author:currentUser?.name||'미지정',buyers:buyersToSave});
   await loadLogs(); // 저장 직후 즉시 재로드
   showToast(`${todayStr} 일지 저장됨`);
@@ -1907,7 +1907,7 @@ window.downloadHistoryDocx=function(){
       if(kw&&!b.name.toLowerCase().includes(kw)) tasks=tasks.filter(t=>(t.text||'').toLowerCase().includes(kw));
       if(!tasks.length) return;
       paras.push(`<w:p><w:pPr><w:spacing w:before="120" w:after="40"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="22"/></w:rPr><w:t>${xmlEsc(b.name)}</w:t></w:r></w:p>`);
-      tasks.forEach(t=>{ paras.push(`<w:p><w:pPr><w:spacing w:after="20"/><w:ind w:left="200"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/>${t.done?'<w:strike/>':''}</w:rPr><w:t xml:space="preserve">${t.done?'☑':'☐'} ${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p>`); });
+      tasks.forEach(t=>{ paras.push(`<w:p><w:pPr><w:spacing w:after="20"/><w:ind w:left="200"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${t.done?'☑':'☐'} ${xmlEsc(t.text)}${t.dueDate?' (기한: '+t.dueDate+')':''}</w:t></w:r></w:p>`); });
     });
   });
   if(!paras.length){ showToast('다운로드할 히스토리가 없습니다'); return; }
